@@ -44,17 +44,16 @@ This source always returns an empty model.
 
 =item dummy_source
 
-This source first uses the 'rdflight.uri' request environment variable or
-the request URI stripped by any query parameters as subject. Then a single
-triple such as the following is returned:
+This source returns a single triple such as the following, based on the
+request URI. The request URI is either taken from the PSGI request variable
+'rdflight.uri' or build from the request's base and path:
 
-    <http://example.org/foo> rdf:type rdfs:Resource .
+    <http://example.org/your/request> rdf:type rdfs:Resource .
 
 =item model_source ( $model )
 
 This function returns a source that returns a bounded description from a 
-model (see L<RDF::Trine::Model>) for a given URI. If 'rdflight.uri' is not 
-set, the request URI minus query parameters is used as URI to look for.
+model (see L<RDF::Trine::Model>) for a given request URI.
 
 =cut
 
@@ -66,11 +65,10 @@ our $rdfs_resource = iri('http://www.w3.org/2000/01/rdf-schema#Resource');
 
 sub dummy_source {
     my $env = shift;
-    my $req = Plack::Request->new( $env );
-    my $base = $env->{'rdflight.uri'} || iri($req->base.$req->path);
+    my $uri = RDF::Light::uri( $env );
 
     my $model = RDF::Trine::Model->temporary_model;
-    $model->add_statement( statement( $base, $rdf_type, $rdfs_resource ) );
+    $model->add_statement( statement( iri($uri), $rdf_type, $rdfs_resource ) );
 
     return $model;
 }
@@ -84,8 +82,9 @@ sub model_source {
 
     sub {
         my $env = shift;
-        my $req = Plack::Request->new( $env );
-        my $uri = $env->{'rdflight.uri'} || $req->base.$req->path;
+        my $uri = RDF::Light::uri( $env );
+
+print "------URI: ".$uri."\n";
 
         return $model->bounded_description( iri($uri) );
     }
