@@ -29,15 +29,35 @@ RDF::Light - Simplified Linked Data handling
 
 =head1 INTRODUCTION
 
-This package provides a PSGI application to serve RDF as Linked Data. This is
-done by disallowing frament identifiers and query parts in URIs and by
-disregarding the distinction between information-resources and non-information
-resources. Some Semantic Web evangelists will be angry about this. By now this
-package is experimental. For a more complete package see L<RDF::LinkedData>.
+This package provides a PSGI application to serve RDF as Linked Data. In
+contrast to other Linked Data applications, URIs must not have query parts and
+the distinction between information-resources and non-information resources is
+disregarded (some Semantic Web evangelists may be angry about this). By now
+this package is experimental. For a more complete package see
+L<RDF::LinkedData>.
 
 The package implements a PSGI application that can be used as
 L<Plack::Middleware> to provide RDF data. The implementation is based on
 L<RDF::Trine> which is a full implementation of RDF standards in Perl.
+
+=head1 OVERVIEW
+
+An RDF::Light application processes PSGI/HTTP requests in three steps:
+
+=over 4
+
+=item 1
+
+Determine query URI and serialization format (mime type) and set the request
+variables C<rdflight.uri>, C<rdflight.type>, and C<rdflight.serializer>.
+
+=item 2
+
+Retrieve data about the resource which is identified by the request URI.
+
+=item 3
+
+Create a serialization.
 
 =cut
 
@@ -70,14 +90,6 @@ our %rdf_formats = (
 sub prepare_app {
     my $self = shift;
 
-    if ( UNIVERSAL::isa( $self->source, 'RDF::Trine::Model' ) ) {
-        $self->source( model_source( $self->source ) );
-    } elsif ( $self->source ) {
-        ref $self->source eq 'CODE' or carp 'source must be a code reference';
-    } else {
-        $self->source( \&empty_source );
-    }
-
     # TODO: support array ref and custom serialization formats
     if ( $self->formats ) {
         ref $self->formats eq 'HASH' or carp 'formats must be a hash reference';
@@ -100,39 +112,57 @@ sub call {
     $env->{'rdflight.uri'} = $self->uri( $env )
         unless defined $env->{'rdflight.uri'};
 
-    $env->{'rdflight.status'} = undef;
-
     if ( $type ) {
         # TODO: document this variables
         $env->{'rdflight.type'}       = $type;
         $env->{'rdflight.serializer'} = $serializer;
 
-        my $rdf = $self->source->( $env );
-
-        my $rdf_data;
-        
-        if ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Model' ) ) { 
-            if ( $rdf->size > 0 ) {
-                $rdf_data  = $serializer->serialize_model_to_string( $rdf );
-            }
-        } elsif ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Iterator' ) ) {
-            if ( $rdf->peek ) {
-                $rdf_data  = $serializer->serialize_iterator_to_string( $rdf );
-            }
-        } else {
-            # TODO: pass through 500 error?
-            # $env->{'rdflight.status'} = 500;
-        }
+        my $rdf_data = $self->retrieve_and_serialize( $env );
 
         if ( defined $rdf_data ) {
-	        return [ 200, [ 'Content-Type' => $type ], [ $rdf_data ] ];
-        #} elsif ( not defined $env->{'rdflight.status'} ) {
-        #    $env->{'rdflight.status'} = 404; # TODO: rdflight.status seems like a hack (?)
+            return [ 200, [ 'Content-Type' => $type ], [ $rdf_data ] ];
         }
     }
  
-    # pass through if no/unknown serializer or empty source (URI not found)
+    # pass through if no/unknown serializer or empty source (URI not found) or error
     return $app->( $env );
+}
+
+sub retrieve_and_serialize {
+    my $self = shift;
+    my $env  = shift;
+
+    return unless defined $self->source;
+
+    my $serializer = $env->{'rdflight.serializer'};
+
+    my $sources = $self->source;
+    $sources = [ $sources ] unless ref $sources and ref $sources eq 'ARRAY';
+
+    foreach my $src (@$sources) {
+        my $rdf; # = $self->source->retrieve($env);
+
+        if ( UNIVERSAL::isa( $src, 'CODE' ) ) {
+            $rdf = $src->($env);
+        } elsif ( UNIVERSAL::isa( $src, 'RDF::Trine::Model' ) ) {
+	    $rdf = $src->bounded_description( iri($env->{'rdflight.uri'}) );
+        }
+
+        if ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Model' ) ) { 
+	    if ( $rdf->size > 0 ) {
+	        return $serializer->serialize_model_to_string( $rdf );
+	    }
+        } elsif ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Iterator' ) ) {
+	    if ( $rdf->peek ) {
+	        return $serializer->serialize_iterator_to_string( $rdf );
+	    }
+        } else {
+	    # TODO: how to indicate an error? (500?)
+	    # $env->{'rdflight.error'} = ... ?
+        }
+    }
+
+    return;
 }
 
 sub guess_serialization {
@@ -209,7 +239,8 @@ Creates a new object.
 =item source
 
 Sets a code reference as RDF source (see L<RDF::Light::Source>) or a
-L<RDF::Trine::Model> to query from.
+L<RDF::Trine::Model> to query from. You can also set an array reference
+with a list of multiple sources, which are cascaded.
 
 =item formats
 
