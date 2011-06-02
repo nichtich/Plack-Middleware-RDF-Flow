@@ -1,17 +1,15 @@
+use strict;
+use warnings;
+
+use lib 't';
+use TestPlackApp;
+
 use Test::More;
 use Plack::Test;
 use Plack::Builder;
 use RDF::Light;
 use RDF::Light::Source;
 use Data::Dumper;
-
-use strict;
-use warnings;
-
-BEGIN {
-    use lib "t";
-    require_ok "app_tests.pl"; 
-}
 
 my $not_found = sub { [404,['Content-Type'=>'text/plain'],['Not found']] };
 
@@ -24,7 +22,7 @@ my $app = builder {
     $uri_not_found;
 };
 
-app_tests
+test_app
     app => $app,
     tests => [{
         request => [ GET => '/example' ],
@@ -47,7 +45,7 @@ for my $base ( ('http://example.org/', '', 'my:') ) {
         $uri_not_found;
     };
 
-    app_tests
+    test_app
         app => $app,
         name => "Rewrite request URIs with base '$base'",
         tests => [{

@@ -1,19 +1,16 @@
+use strict;
+use warnings;
+
+use lib 't';
+use TestPlackApp;
+
 use Test::More;
 use Plack::Test;
 use Plack::Builder;
-use HTTP::Request;
 use Data::Dumper;
 use Try::Tiny;
 use RDF::Light;
 use RDF::Light::Source;
-
-use strict;
-use warnings;
-
-BEGIN {
-    use lib "t";
-    require_ok "app_tests.pl"; 
-}
 
 my $not_found = sub { [404,['Content-Type'=>'text/plain'],['Not found']] };
 
@@ -22,7 +19,7 @@ my $app = builder {
     $not_found;
 };
 
-app_tests
+test_app
     app => $app,
     tests => [{
         name    => 'Nobody asked for RDF',
@@ -55,7 +52,7 @@ $app = builder {
     $not_found;
 };
 
-app_tests 
+test_app 
     app => $app,
     tests => [{
         name    => 'nobody asked for RDF',

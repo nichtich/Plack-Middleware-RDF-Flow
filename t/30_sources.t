@@ -1,19 +1,16 @@
+use strict;
+use warnings;
+
+use lib 't';
+use TestPlackApp;
+
 use Test::More;
 use Plack::Test;
 use Plack::Builder;
-use HTTP::Request;
 use RDF::Light;
 use RDF::Light::Source;
 use RDF::Trine::Model;
 use RDF::Trine qw(iri statement);
-
-use strict;
-use warnings;
-
-BEGIN {
-    use lib "t";
-    require_ok "app_tests.pl"; 
-}
 
 my $not_found = sub { [404,['Content-Type'=>'text/plain'],['Not found']] };
 
@@ -21,7 +18,7 @@ my $example_model = RDF::Trine::Model->temporary_model;
 $example_model->add_statement(statement( 
     map { iri("http://example.com/$_") } qw(subject predicate object) ));
 
-app_tests
+test_app
     name => "RDF::Trine::Model as source",
     app => builder {
         enable "+RDF::Light", 
@@ -39,7 +36,7 @@ app_tests
         code    => 404,
     }];
  
-app_tests
+test_app
     name => "Array of sources",
     app => builder {
         enable "+RDF::Light", 

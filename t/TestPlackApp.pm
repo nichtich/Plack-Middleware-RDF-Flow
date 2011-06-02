@@ -1,6 +1,17 @@
-# package Plack::Test::App; # put this into a dedicated testing module?
+use strict;
+use warnings;
+package TestPlackApp;
 
-sub is_like { # I wonder why this is not part of Test::More
+use Carp;
+use parent 'Exporter';
+use Plack::Builder;
+use HTTP::Request;
+use Test::More;
+use Plack::Test;
+
+our @EXPORT = qw(test_app);
+
+sub is_like {
     my ($got, $expected, $message) = @_;
     if ( ref $expected and ref $expected eq 'Regexp' ) {
         like( $got, $expected, $message );
@@ -10,7 +21,7 @@ sub is_like { # I wonder why this is not part of Test::More
 }
 
 # run an array of tests with expected response on an app
-sub app_tests {
+sub test_app {
     my %arg = @_;
 
     my $app = $arg{app};
@@ -42,14 +53,14 @@ sub app_tests {
 
                 my $res = $cb->( HTTP::Request->new( @{$test->{request}} ) );
 
-                if ( defined $test->{content} ) {
-                    is_like( $res->content, $test->{content}, 
-                        "Got content as expected" );
-                }
-
                 if ( defined $test->{code} ) {
                     is( $res->code, $test->{code}, 
-                        "Got status code as expected" );
+                        'Got status code '.$res->code.' as expected' );
+                }
+
+                if ( defined $test->{content} ) {
+                    is_like( $res->content, $test->{content}, 
+                        'Got content as expected' );
                 }
 
                 if ( defined $test->{headers} ) {
