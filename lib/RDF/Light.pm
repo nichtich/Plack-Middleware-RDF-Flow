@@ -1,6 +1,7 @@
+package RDF::Light;
+
 use strict;
 use warnings;
-package RDF::Light;
 
 =head1 NAME
 
@@ -290,6 +291,18 @@ as function and export it on request.
 Returns a request URI as string. The request URI is either taken from
 C<$env->{'rdflight.uri'}> (if defined) or constructed from request's base 
 and path. Query parameters are ignored.
+
+=cut
+
+=head2 SEE ALSO
+
+See also L<RDF::Light::Graph>.
+RDF::Light may be renamed to RDF::Light::LOD for "Linked Open Data".
+
+=head2 ACKNOWLEDGEMENTS
+
+This package is actually a very thin layer on top of existing packages such as
+L<RDF::Trine>, L<Plack>, and L<Template>. Theirs authors deserve all thanks.
 
 =cut
 

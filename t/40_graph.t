@@ -5,6 +5,7 @@ use Test::More;
 use RDF::Trine qw(iri literal blank);
 use RDF::Trine::NamespaceMap;
 use RDF::Trine::Parser;
+use Data::Dumper;
 
 use_ok 'RDF::Light::Graph';
 
@@ -30,6 +31,7 @@ isa_ok $blank, 'RDF::Light::Node::Blank';
 is $blank->id, 'x1', 'blank id';
 
 is $graph->blank("x1")->id, $blank->id, 'construct via ->blank';
+is RDF::Light::Node::Blank->new( $graph, 'x1' )->id, $blank->id, 'blank constructor';
 
 my $uri = $graph->node( iri('http://example.com/"') );
 isa_ok $uri, 'RDF::Light::Node::Resource';
@@ -40,7 +42,8 @@ is $uri->esc,  'http://example.com/&quot;', 'HTML escape URI';
 is $graph->resource('http://example.com/"')->uri, $uri->uri, 'construct via ->resource';
 
 my $map  = RDF::Trine::NamespaceMap->new({
-  foaf => iri('http://xmlns.com/foaf/0.1/')
+  foaf => iri('http://xmlns.com/foaf/0.1/'),
+  ''   => iri('http://example.org/')
 });
 my $base = 'http://example.org/';
 my $model = RDF::Trine::Model->new;
@@ -58,14 +61,23 @@ my $a = $graph->resource('http://example.org/alice');
 $obj = $a->foaf_name;
 is_deeply( "$obj", 'Alice', 'literal object');
 
-# TODO: $graph->get('ex:alice')->{'foaf_knows'}
+$obj = $a->zonk;
+is_deeply( "$obj", 'Foo', 'property with default namespace');
+
+is $graph->node('alice')->uri, 'http://example.org/alice';
+is $graph->bob->foaf_name->str, 'Bob', 'chaining accesors';
+
+is $graph->foaf_name->uri, 'http://xmlns.com/foaf/0.1/name', 'namespace URI';
+is $graph->foaf__name->uri, 'http://example.org/foaf_name', 'non-namespace URI';
 
 done_testing;
 
 __DATA__
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix x: <http://example.org/> .
 <http://example.org/alice> foaf:knows <http://example.org/bob> .
 <http://example.org/bob>   foaf:knows <http://example.org/alice> .
 <http://example.org/alice> foaf:name "Alice" .
 <http://example.org/bob>   foaf:name "Bob" .
+<http://example.org/alice> x:zonk "Foo" .
 
