@@ -1,0 +1,16 @@
+<html>
+  <head>
+   <title>Countries</title>
+  </head>
+  <body>
+   <h1>Countries</h1>
+   <p>This sample application list ISO country codes.</p>
+   <ul>
+     [% FOR c IN countries %]
+     <li>[% c.name %]<br/>[% c %]</li>
+     [% END %]
+   </ul>
+   [% INCLUDE "footer.html" %]
+  </body>
+</html>
+

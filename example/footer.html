@@ -1,0 +1,8 @@
+<div id='footer'>
+  [%IF uri %]
+    &lt;[% uri %]&gt;
+    [% FOREACH f IN formats %]
+      <a href="?format=[% f %]">[% f %]</a>
+    [% END %]
+  [% END %]
+</div>

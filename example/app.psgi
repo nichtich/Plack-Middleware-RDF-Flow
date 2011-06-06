@@ -1,7 +1,9 @@
 use strict;
 use warnings;
 
-# Experimental PSGI app to test:
+# Experimental PSGI app for testing RDF::Light modules
+# This source code is ugly because it is work in progress
+
 use RDF::Light;
 use RDF::Light::Graph;
 
@@ -34,9 +36,9 @@ my $ns = RDF::Trine::NamespaceMap->new({
 my $app = sub {
     my $env = shift;
     my $uri = RDF::Light::uri($env);
-    my ($code, $msg) = (404,"URI $uri not found");
+    my ($code, $msg, $content) = (404,"URI $uri not found");
 
-#    $env->{'psgix.logger'}->({ level => "warn", message => "Hallo" });
+    $env->{'psgix.logger'}->({ level => "info", message => "APP" });
 
     my $iterator = $model->get_statements( iri($uri), undef, undef );
 
@@ -44,23 +46,68 @@ my $app = sub {
         $code = 200;
         my $graph = RDF::Light::Graph->new( namespaces => $ns );
         $graph->add( $iterator );
-        my $vars = { uri => $graph->node(iri($uri)) };
+        my $vars = { uri => $graph->node(iri($uri)), formats => [qw(json ttl rdf)] };
         my $out = "";
 
         if ( $tt->process("country.html", $vars, \$out) ) {
-            $msg = $out;
-            utf8::downgrade($msg);
+            $content = $out;
+            utf8::downgrade($content);
         } else {
             $code = 500;
             $msg = $tt->error->as_string;
         }
     }
 
-    return [ $code, ['Content-Type'=>'text/html'], [ $msg ] ];
+    if (!$content) {
+        $content = <<HTML
+<html><head></head><body>
+<p>$msg</p>
+</body>
+HTML
+    }
+
+    return [ $code, ['Content-Type'=>'text/html'], [ $content ] ];
+};
+
+# inline middleware
+my $index_app = sub {
+    my $app = shift;
+    sub {
+        my $env = shift;
+        my $uri = RDF::Light::uri($env);
+        my $content = "";
+
+        $env->{'psgix.logger'}->({ level => "info", message => "Index with $uri and $base" });
+
+        return $app->($env) unless $uri eq $base;
+
+        my $graph = RDF::Light::Graph->new( namespaces => $ns, model => $model );
+        my $vars = { 
+            #uri => $graph->node(iri($base)), 
+            countries => []
+        };
+
+        my $iterator = $model->get_statements( undef, $ns->uri('rdfs:type'), $ns->namespace_uri('')->Country );
+
+        while (my $st = $iterator->next) {
+           push @{$vars->{countries}}, $graph->node( $st->subject );
+        }
+
+        # TODO: error handling (use Plack::Middleware::TemplateToolkit
+        $tt->process("index.html", $vars, \$content);
+        utf8::downgrade($content);
+        
+        $env->{'psgix.logger'}->({ level => "info", message => "Index done" });
+        return [ 200, ['Content-Type' => 'text/html'], [$content]];
+    };
 };
 
 builder {
-    enable "SimpleLogger";
+    enable 'SimpleLogger';
+    enable 'JSONP'; # for RDF/JSON in AJAX
+    enable 'Debug';
     enable "+RDF::Light", source => $model, base => $base;
+    enable $index_app;
     $app;
 };
+
