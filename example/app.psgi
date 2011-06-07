@@ -22,7 +22,7 @@ use Template;
 
 my $dir  = Cwd::realpath( dirname($0) );
 my $file = File::Spec->catfile( $dir, 'countries.rdf' );
-my $tt = Template->new( INCLUDE_PATH => $dir );
+my $tt = Template->new( INCLUDE_PATH => $dir, INTERPOLATE  => 1 );
 
 my $base = 'http://downlode.org/rdf/iso-3166/countries#';
 my $model = RDF::Trine::Model->new("Memory;file:$file");
@@ -97,15 +97,17 @@ my $index_app = sub {
         $tt->process("index.html", $vars, \$content);
         utf8::downgrade($content);
         
-        $env->{'psgix.logger'}->({ level => "info", message => "Index done" });
+        $env->{'psgix.logger'}->({ level => "info", message => "Index done:$content" });
+
         return [ 200, ['Content-Type' => 'text/html'], [$content]];
     };
 };
 
 builder {
     enable 'SimpleLogger';
-    enable 'JSONP'; # for RDF/JSON in AJAX
     enable 'Debug';
+    enable 'Plack::Middleware::Static', root => $dir, path => qr/\.css$/;
+    enable 'JSONP'; # for RDF/JSON in AJAX
     enable "+RDF::Light", source => $model, base => $base;
     enable $index_app;
     $app;

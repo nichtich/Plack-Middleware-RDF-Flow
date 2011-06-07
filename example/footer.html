@@ -1,8 +1,10 @@
-<div id='footer'>
-  [%IF uri %]
-    &lt;[% uri %]&gt;
+  <div id='footer'>
+   [%IF uri %]
+    &lt;<a href="${uri.href}">$uri</a>&gt;
     [% FOREACH f IN formats %]
-      <a href="?format=[% f %]">[% f %]</a>
+      <a href="?format=$f">$f</a>
     [% END %]
-  [% END %]
-</div>
+   [% END %]
+  </div>
+ </body>
+</html>
