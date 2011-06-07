@@ -1,18 +1,18 @@
 <html>
+  [% c = uri %]
   <head>
-   <!-- TODO: first get english name -->
-   <title>[% uri.name %]</title>
+   <title>[% c.name('@en') %]</title>
   </head>
   <body>
-   <h1>[% uri.name %]</h1>
+   <h1>[% c.name('@en') %]</h1>
    <dl>
-     [% IF uri.alpha__2 %]
+     [% IF c.alpha__2 %]
        <dd>ISO 3166 alpha-2</dd>
-       <dd>[% uri.alpha__2 %]</dd>
+       <dd>[% c.alpha__2 %]</dd>
      [% END %]
-     [% IF uri.alpha__3 %]
+     [% IF c.alpha__3 %]
        <dd>ISO 3166 alpha-3</dd>
-       <dd>[% uri.alpha__3 %]</dd>
+       <dd>[% c.alpha__3 %]</dd>
      [% END %]
    </dl>
    [% INCLUDE "footer.html" %]

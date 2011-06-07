@@ -9,12 +9,13 @@ RDF::Light::Graph - Lightweight access to RDF data
 
 =head1 DESCRIPTION
 
-This package provides some classes that wrap L<RDF::Trine::Node> and its
-subclasses for easy use of RDF data, especially within L<Template> Toolkit.
-Basically there is RDF::Light::Graph for RDF graphs and there are
-RDF::Light::Literal, RDF::Light::Resource, and RDF::Light::Blank for RDF nodes,
-which each belong to an RDF graph.  Internally each node is represented by a
-L<RDF::Trine::Node> objects that is connected to a particular RDF::Light::Graph.
+This package provides classes for a node-centric API to access RDF data. The
+classes wrap L<RDF::Trine::Node> and its subclasses for easy use of RDF data,
+especially within L<Template> Toolkit.  Basically there is RDF::Light::Graph
+for RDF graphs and there are RDF::Light::Literal, RDF::Light::Resource, and
+RDF::Light::Blank for RDF nodes, which each belong to an RDF graph.  Internally
+each node is represented by a L<RDF::Trine::Node> objects that is connected to
+a particular RDF::Light::Graph.
 
 =cut
 
@@ -25,8 +26,8 @@ our $AUTOLOAD;
 
 sub new {
     my ($class, %arg) = @_;
-    my $namespaces = $arg{namespaces} || RDF::Trine::NamespaceMap->new;
-    my $model      = $arg{model}      || RDF::Trine::Model->new;
+    my $namespaces    = $arg{namespaces} || RDF::Trine::NamespaceMap->new;
+    my $model         = $arg{model}      || RDF::Trine::Model->new;
 
     bless {
         namespaces => $namespaces,
@@ -37,7 +38,10 @@ sub new {
 sub model { shift->{model} }
 
 sub objects {
-    my ($self, $subject, $property) = @_;
+    my $self     = shift;
+    my $subject  = shift;
+    my $property = shift;
+    my @filter   = @_;
 
     $subject = $self->node($subject)
         unless UNIVERSAL::isa( $subject, 'RDF::Light::Node' );
@@ -47,12 +51,19 @@ sub objects {
 
     if (defined $predicate) {
         my @objects = $self->{model}->objects( $subject->trine, $predicate->trine );
+
+        @objects = map { $self->node( $_ ) } @objects;
+
+        # TODO apply filters one by one and return in order of filters
+        @objects = grep { $_->is(@filter) } @objects
+            if @filter;
+
         return unless @objects;
         
         if ($all) {
-           return [ map { $self->node( $_ ) } @objects ];
+           return \@objects;
         } else {   
-           return $self->node( $objects[0] );
+           return $objects[0];
         }
     }
 
@@ -106,7 +117,7 @@ sub add {
     if (UNIVERSAL::isa($add, 'RDF::Trine::Statement')) {
         $self->model->add_statement( $add );
     } elsif (UNIVERSAL::isa($add, 'RDF::Trine::Iterator')) {
-        # No RDF::Trine::Model::add_iterator ?
+        # Is there no RDF::Trine::Model::add_iterator ??
         while (my $st = $add->next) {
             $self->add( $st );
         }
@@ -128,15 +139,56 @@ sub AUTOLOAD {
 
 package RDF::Light::Node;
 
+our $AUTOLOAD;
+
 sub trine { shift->[0]; }
 sub graph { shift->[1]; }
 sub esc   { shift->str; }
+
+sub is_literal  { shift->[0]->is_literal; }
+sub is_resource { shift->[0]->is_resource; }
+sub is_blank    { shift->[0]->is_blank; }
+
+sub _autoload { }
+
+sub AUTOLOAD {
+    my $self = shift;
+    return if !ref($self) or $AUTOLOAD =~ /^(.+::)?DESTROY$/;
+
+    my $method = $AUTOLOAD;
+    $method =~ s/.*:://;
+
+    return $self->_autoload( $method, @_ );
+}
+
+sub is {
+    my $self     = shift;
+    return 1 unless @_;
+
+    foreach my $check (@_) {
+        if ($self->is_literal) {
+            return 1 if $check eq '' or $check eq 'literal';
+            return 1 if $check eq '@' and $self->lang;
+            return 1 if $check =~ /^@(.+)/ and $self->lang($1);
+            return 1 if $check eq /^\^\^?$/ and $self->datatype;
+        } elsif ($self->is_resource) {
+            return 1 if $check eq ':' or $check eq 'resource';
+        } elsif ($self->is_blank) {
+            return 1 if $check eq '-' or $check eq 'blank';
+        }
+    }
+
+    return 0;
+}
 
 package RDF::Light::Node::Literal;
 use base 'RDF::Light::Node';
 use CGI qw(escapeHTML);
 
 use overload '""' => sub { shift->str; };
+
+# not very strict check for language tag look-alikes (see www.langtag.net)
+our $LANGTAG = qr/^(([a-z]{2,8}|[a-z]{2,3}-[a-z]{3})(-[a-z0-9_]+)?-?)$/;
 
 sub new {
     my $class  = shift;
@@ -155,7 +207,21 @@ sub str { shift->trine->literal_value }
 
 sub esc { escapeHTML( shift->trine->literal_value ) }
 
-sub lang { shift->trine->literal_value_language } # TODO: 'language' object?
+sub lang { 
+    my $self = shift;
+    my $lang = $self->trine->literal_value_language;
+    return $lang if not @_ or not $lang;
+
+    my $xxx = shift || "";
+    $xxx =~ s/_/-/g;
+    return unless $xxx =~ $LANGTAG;
+
+    if ( $xxx eq $lang or $xxx =~ s/-$// and index($lang, $xxx) == 0 ) {
+        return $lang;
+    }
+
+    return; 
+}
 
 sub type { 
     my $self = shift;
@@ -164,6 +230,17 @@ sub type {
 
 # we may use a HTML method for xml:lang="lang">$str</
 
+sub _autoload {
+    my $self   = shift;
+    my $method = shift;
+
+    return unless $method =~ /^is_(.+)$/;
+
+    # We assume that no language is named 'blank', 'literal', or 'resource'
+    return 1 if $self->lang($1);
+        
+    return;
+}
 
 package RDF::Light::Node::Blank;
 use base 'RDF::Light::Node';
@@ -193,8 +270,6 @@ use base 'RDF::Light::Node';
 use CGI qw(escapeHTML);
 
 use overload '""' => sub { shift->str; };
-
-our $AUTOLOAD;
 
 sub new {
     my $class    = shift;
@@ -226,16 +301,11 @@ sub objects { # TODO: rename to 'attr' or 'prop' ?
 *esc = *href;
 *str = *uri;
 
-sub AUTOLOAD {
-    my $self = shift;
-    return if !ref($self) or $AUTOLOAD =~ /^(.+::)?DESTROY$/;
-
-    my $property = $AUTOLOAD;
-    $property =~ s/.*:://;
-
+sub _autoload {
+    my $self     = shift;
+    my $property = shift;
     return if $property =~ /^(query|lang)$/; # reserved words
-
-    return $self->objects( $property );
+    return $self->objects( $property, @_ );
 }
 
 1;
@@ -261,7 +331,7 @@ To convert a RDF::Trine::Node object into a RDF::Light::Node, you can use:
 
 Note that all these methods silently return undef on failure.
 
-Each RDF::Light::Node provides at least three access methods:
+Each RDF::Light::Node provides at least the following methods:
 
 =over 4
 
@@ -274,6 +344,14 @@ called on string conversion (C<< "$x" >> equals C<< $x->str >>).
 
 Returns a HTML-escaped string representation. This can safely be used
 in HTML and XML.
+
+=item is_literal / is_resource / is_blank
+
+Returns true if the node is a literal / resource / blank node.
+
+=item is ( $check1 [, $check2 ... ] ) 
+
+Checks whether the node fullfills some matching criteria. 
 
 =item trine
 
@@ -295,11 +373,19 @@ In addition for literal nodes:
 
 =item lang
 
-...
+Return the literal's language tag (if the literal has one).
 
 =item type
 
 ...
+
+=item is_xxx
+
+Returns whether the literal has language tag xxx, where xxx is a BCP 47 language
+tag locator. For instance C<is_en> matches language tag C<en> (but not C<en-us>), 
+C<is_en_us> matches language tag C<en-us> and C<is_en_> matches C<en> and all
+language tags that start with C<en->. Use C<lang> to check whether there is any
+language tag.
 
 =back
 
@@ -330,12 +416,22 @@ In addition for resource nodes:
 Any other method name is used to query objects. The following three statements
 are equivalent:
 
-   $x->foaf_name;
-   $x->objects('foaf_name');
-   $x->graph->objects( $x, 'foaf_name' );
+    $x->foaf_name;
+    $x->objects('foaf_name');
+    $x->graph->objects( $x, 'foaf_name' );
 
 =back
 
+You can also add filters in a XPath-like language (the use of RDF::Light::Graph 
+in a template is an example of a "RDFPath" language):
+  
+    $x->dc_title('@en')   # literal with language tag @en
+    $x->dc_title('@en-')  # literal with language tag @en or @en-...
+    $x->dc_title('')      # any literal
+    $x->dc_title('@')     # literal with any language tag
+    $x->dc_title('^')     # literal with any datatype
+    $x->foaf_knows(':')   # any resource
+    ...
 
 =head1 GRAPH METHODS
 
