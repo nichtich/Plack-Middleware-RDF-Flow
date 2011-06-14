@@ -97,7 +97,7 @@ my $index_app = sub {
         $tt->process("index.html", $vars, \$content);
         utf8::downgrade($content);
         
-        $env->{'psgix.logger'}->({ level => "info", message => "Index done:$content" });
+        #$env->{'psgix.logger'}->({ level => "info", message => "Index done:$content" });
 
         return [ 200, ['Content-Type' => 'text/html'], [$content]];
     };
@@ -106,9 +106,9 @@ my $index_app = sub {
 builder {
     enable 'SimpleLogger';
     enable 'Debug';
-    enable 'Plack::Middleware::Static', root => $dir, path => qr/\.css$/;
-    enable 'JSONP'; # for RDF/JSON in AJAX
-    enable "+RDF::Light", source => $model, base => $base;
+    enable 'JSONP'; # to support RDF/JSON in AJAX
+    enable 'Static', root => $dir, path => qr/\.css$/;
+    enable '+RDF::Light', source => $model, base => $base;
     enable $index_app;
     $app;
 };

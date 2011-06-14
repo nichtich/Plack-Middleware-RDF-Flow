@@ -10,6 +10,7 @@ use Data::Dumper;
 use Template;
 
 use RDF::Light::Graph;
+use Carp;
 
 sub ttl_model {
     my $turtle = shift;
@@ -43,8 +44,8 @@ $graph = RDF::Light::Graph->new( namespaces => $map, model => $model );
 
 my $a = $graph->resource('http://example.com/"');
  
-test_tt('[% a %]', { a => $a }, 'http://example.com/"');
-test_tt('[% a.href %]', { a => $a }, 'http://example.com/&quot;');
+test_tt('[% a %]', { a => $a }, 'http://example.com/"', 'plain URI with quot');
+test_tt('[% a.href %]', { a => $a }, 'http://example.com/&quot;', 'escaped URI with quot');
 
 $a = $graph->resource('http://example.org/alice');
 $vars = { 'a' => $a };

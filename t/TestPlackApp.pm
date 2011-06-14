@@ -22,7 +22,7 @@ sub is_like {
 
 # run an array of tests with expected response on an app
 sub test_app {
-    my %arg = @_;
+    my %arg = ref($_[0]) ? (app => $_[0], tests => $_[1], name => $_[2]) : @_;
 
     my $app = $arg{app};
 
@@ -101,11 +101,24 @@ sub test_app {
         }
     };
 
-    if ($arg{'name'}) {
-        subtest $arg{'name'} => $run;
+    if ($arg{name}) {
+        subtest $arg{name} => $run;
     } else {
         $run->();
     }
 }
 
 1;
+
+=head1 NAME
+
+TestPlackApp - Test PSGI applications with Plack::Test
+
+=head1 SEE ALSO
+
+L<Test::WWW::Mechanize::Plack>.
+
+This module is located at L<https://gist.github.com/1024502> until it is 
+merged into another Perl module or published as tested module.
+
+=cut

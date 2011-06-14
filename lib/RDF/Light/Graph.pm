@@ -1,7 +1,6 @@
-package RDF::Light::Graph;
-
 use strict;
 use warnings;
+package RDF::Light::Graph;
 
 =head1 NAME
 
@@ -35,7 +34,7 @@ sub new {
     }, $class;
 }
 
-sub model { shift->{model} }
+sub model { $_[0]->{model} }
 
 sub objects {
     my $self     = shift;
@@ -46,7 +45,7 @@ sub objects {
     $subject = $self->node($subject)
         unless UNIVERSAL::isa( $subject, 'RDF::Light::Node' );
 
-    my $all = 1 if ($property =~ s/^(.+[^_])_$/$1/);
+    my $all = ($property =~ s/^(.+[^_])_$/$1/) ? 1 : 0;
     my $predicate = $self->node($property);
 
     if (defined $predicate) {
@@ -287,11 +286,11 @@ sub new {
 }
 
 sub uri { 
-    shift->trine->value 
+    shift->trine->uri_value 
 }
 
 sub href { # TODO: check whether non-XML characters are possible
-    escapeHTML(shift->trine->value); 
+    escapeHTML(shift->trine->uri_value); 
 }
 
 sub objects { # TODO: rename to 'attr' or 'prop' ?

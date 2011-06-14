@@ -54,4 +54,24 @@ test_app
         code    => 200,
     }];
 
+my $src = MySource->new;
+
+test_app 
+    name => "Module as source",
+    app => RDF::Light->new( base => "http://example.com/", source => $src ),
+    tests => [{
+        request => [ 'GET', '/foo', [ 'Accept' => 'text/turtle' ] ],
+        content => qr{foo> a.+Resource>},
+        code    => 200,
+    }];
+
 done_testing;
+
+package MySource;
+use base 'RDF::Light::Source';
+use RDF::Light::Source;
+
+sub new { bless {}, shift; }
+sub retrieve { dummy_source( $_[1] ) }
+
+1;
