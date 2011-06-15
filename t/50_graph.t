@@ -45,6 +45,7 @@ is $blank->id, 'x1', 'blank id';
 is $graph->blank("x1")->id, $blank->id, 'construct via ->blank';
 is RDF::Light::Node::Blank->new( $graph, 'x1' )->id, $blank->id, 'blank constructor';
 
+# TODO: test accessing properties of blank nodes
 
 diag('resource nodes');
 my $uri = $graph->node( iri('http://example.com/"') );
@@ -97,6 +98,10 @@ is_deeply( "$obj", 'bar', 'property with filter');
 # TODO:
 # $obj = $a->zonk('@fr','');
 # is_deeply( "$obj", 'bar', 'property with filter');
+
+# TODO: Test dumper
+my $d = $a->turtle;
+ok $d, 'has dump';
 
 done_testing;
 

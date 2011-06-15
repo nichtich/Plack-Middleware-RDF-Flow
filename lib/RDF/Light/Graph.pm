@@ -20,6 +20,7 @@ a particular RDF::Light::Graph.
 
 use RDF::Trine::Model;
 use RDF::Trine::NamespaceMap;
+use CGI qw(escapeHTML);
 
 our $AUTOLOAD;
 
@@ -36,15 +37,16 @@ sub new {
 
 sub model { $_[0]->{model} }
 
-sub objects {
+sub objects { # TODO: rename to 'attr' or 'prop' ?
     my $self     = shift;
     my $subject  = shift;
-    my $property = shift;
+    my $property = shift; # mandatory
     my @filter   = @_;
 
     $subject = $self->node($subject)
         unless UNIVERSAL::isa( $subject, 'RDF::Light::Node' );
 
+    # TODO: support ns:local syntax in addition to ns_local
     my $all = ($property =~ s/^(.+[^_])_$/$1/) ? 1 : 0;
     my $predicate = $self->node($property);
 
@@ -67,6 +69,23 @@ sub objects {
     }
 
     return;
+}
+
+sub turtle { # FIXME
+    my $self     = shift;
+    my $subject  = shift;
+
+    $subject = $self->node($subject)
+        unless UNIVERSAL::isa( $subject, 'RDF::Light::Node' );
+   
+    use RDF::Trine::Serializer::Turtle;
+    my $serializer = RDF::Trine::Serializer::Turtle->new( namespaces => $self->{namespaces} );
+
+    my $iterator = $self->{model}->bounded_description( $subject->trine );
+    my $turtle   = $serializer->serialize_iterator_to_string( $iterator );
+    my $html     = escapeHTML( '# '.$subject->str."\n$turtle" );
+
+    return '<pre class="turtle">'.$html.'</pre>';
 }
 
 sub resource { RDF::Light::Node::Resource->new( @_ ) }
@@ -120,6 +139,8 @@ sub add {
         while (my $st = $add->next) {
             $self->add( $st );
         }
+    } elsif (UNIVERSAL::isa($add, 'RDF::Trine::Model')) {
+        $self->add( $add->as_stream ); # TODO: test this
     }
 }
 
@@ -148,8 +169,6 @@ sub is_literal  { shift->[0]->is_literal; }
 sub is_resource { shift->[0]->is_resource; }
 sub is_blank    { shift->[0]->is_blank; }
 
-sub _autoload { }
-
 sub AUTOLOAD {
     my $self = shift;
     return if !ref($self) or $AUTOLOAD =~ /^(.+::)?DESTROY$/;
@@ -161,7 +180,7 @@ sub AUTOLOAD {
 }
 
 sub is {
-    my $self     = shift;
+    my $self = shift;
     return 1 unless @_;
 
     foreach my $check (@_) {
@@ -179,6 +198,22 @@ sub is {
 
     return 0;
 }
+
+sub turtle {
+    return $_[0]->graph->turtle( @_ );
+}
+
+sub objects { # TODO: rename to 'attr' or 'prop' ?
+    $_[0]->graph->objects( @_ ); 
+}
+
+sub _autoload {
+    my $self     = shift;
+    my $property = shift;
+    return if $property =~ /^(query|lang)$/; # reserved words
+    return $self->objects( $property, @_ );
+}
+
 
 package RDF::Light::Node::Literal;
 use base 'RDF::Light::Node';
@@ -241,6 +276,9 @@ sub _autoload {
     return;
 }
 
+sub objects { } # literal notes have no properties
+
+
 package RDF::Light::Node::Blank;
 use base 'RDF::Light::Node';
 
@@ -260,9 +298,10 @@ sub id {
     shift->trine->blank_identifier
 }
 
-*str = *id;
+sub str { # TODO: check whether non-XML characters are possible for esc
+    '_:'.shift->trine->blank_identifier
+}
 
-# TODO: check whether non-XML characters are possible for esc
 
 package RDF::Light::Node::Resource;
 use base 'RDF::Light::Node';
@@ -293,19 +332,8 @@ sub href { # TODO: check whether non-XML characters are possible
     escapeHTML(shift->trine->uri_value); 
 }
 
-sub objects { # TODO: rename to 'attr' or 'prop' ?
-    $_[0]->graph->objects( @_ ); 
-}
-
 *esc = *href;
 *str = *uri;
-
-sub _autoload {
-    my $self     = shift;
-    my $property = shift;
-    return if $property =~ /^(query|lang)$/; # reserved words
-    return $self->objects( $property, @_ );
-}
 
 1;
 
@@ -359,6 +387,16 @@ Returns the underlying L<RDF::Trine::Node>.
 =item graph
 
 Returns the underlying graph L<RDF::Light::Graph> that the node belongs to.
+
+=item turtle
+
+Returns an HTML escaped RDF/Turtle representation of the node's bounded 
+connections.
+
+=item dump
+
+Returns an HTML representation of the node and its connections
+(not implemented yet).
 
 =back
 
@@ -461,7 +499,16 @@ method, so the following statements are equivalent:
 Returns a list of objects that occur in statements in this graph. The full
 functionality of this method is not fixed yet.
 
+=item turtle ( [ $node ] )
+
+Returns an HTML escaped RDF/Turtle representation of a node's bounded 
+connections (not fully implemented yet).
+
+=item dump ( [ $node ] )
+
+Returns an HTML representation of a selected node and its connections or of
+the full graph (not implemented yet).
+
 =back
 
 =cut
-
