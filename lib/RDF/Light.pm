@@ -38,6 +38,7 @@ use Carp;
 use RDF::Light::Source;
 
 use parent 'Plack::Middleware';
+#use parent 'RDF::Light::Source';
 use Plack::Util::Accessor qw(source base formats via_param via_extension);
 
 use parent 'Exporter';
@@ -83,7 +84,19 @@ sub call {
         $env->{'rdflight.type'}       = $type;
         $env->{'rdflight.serializer'} = $serializer;
 
-        my $rdf_data = $self->retrieve_and_serialize( $env );
+        my $rdf = $self->retrieve( $env );
+
+        if ( $env->{'rdflight.error'} ) {
+            return [ 500, [ 'Content-Type' => 'text/plain' ], [ $env->{'rdflight.error'} ] ];
+        }
+
+        my $rdf_data;
+
+        if ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Model' ) ) { 
+            $rdf_data = $serializer->serialize_model_to_string( $rdf );
+        } elsif ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Iterator' ) ) { 
+            $rdf_data = $serializer->serialize_iterator_to_string( $rdf );
+        }
 
         if ( defined $rdf_data ) {
             return [ 200, [ 'Content-Type' => $type ], [ $rdf_data ] ];
@@ -98,42 +111,39 @@ sub call {
     }
 }
 
-sub retrieve_and_serialize {
+sub retrieve {
     my $self = shift;
     my $env  = shift;
 
-    return unless defined $self->source;
-
-    my $serializer = $env->{'rdflight.serializer'};
-
-    my $sources = $self->source;
+    my $sources = $self->source or return;
     $sources = [ $sources ] unless ref $sources and ref $sources eq 'ARRAY';
 
     foreach my $src (@$sources) {
-        my $rdf; # = $self->source->retrieve($env);
+        my $rdf = try {
+            if ( UNIVERSAL::isa( $src, 'CODE' ) ) {
+                $src->($env);
+            } elsif ( UNIVERSAL::isa( $src, 'RDF::Trine::Model' ) ) {
+                $src->bounded_description( iri($env->{'rdflight.uri'}) );
+            } elsif ( UNIVERSAL::can( $src, 'retrieve' ) ) {
+                $src->retrieve( $env );
+            }
+        } catch {
+            $_ =~ s/ at.+ line \d+.?\n?//; # TODO: is there a cleaner way?
+            $env->{'rdflight.error'} = $_;
+            RDF::Trine::Model->new;
+        };
 
-        if ( UNIVERSAL::isa( $src, 'CODE' ) ) {
-            $rdf = $src->($env);
-        } elsif ( UNIVERSAL::isa( $src, 'RDF::Trine::Model' ) ) {
-            $rdf = $src->bounded_description( iri($env->{'rdflight.uri'}) );
-        } elsif ( UNIVERSAL::can( $src, 'retrieve' ) ) {
-            $rdf = $src->retrieve( $env );
-        }
+        return unless defined $rdf;
 
         if ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Model' ) ) { 
-            if ( $rdf->size > 0 ) {
-                return $serializer->serialize_model_to_string( $rdf );
-            }
+            return $rdf if $rdf->size > 0;
         } elsif ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Iterator' ) ) {
-            if ( $rdf->peek ) {
-                return $serializer->serialize_iterator_to_string( $rdf );
-            }
+            return $rdf if $rdf->peek;
         } else {
-            # TODO: how to indicate an error? (500?)
-            # $env->{'rdflight.error'} = ... ?
+            $env->{'rdflight.error'} = 'Invalid source';
         }
-    }
-
+    }    
+    
     return;
 }
 
@@ -248,6 +258,15 @@ Create a serialization.
 =head2 new ( [ %configuration ] )
 
 Creates a new object.
+
+=head2 retrieve ( $env )
+
+Given a L<PSGI> environment, this method queries the source(s) for a 
+requested URI (if given) and either returns undef or a non-empty
+L<RDF::Trine::Model> or L<RDF::Trine::Iterator>. On error this method
+does not die but sets the environment variable rdflight.error. Note that
+if there are multiple source, there may be both an error, and a return 
+value.
 
 =head2 CONFIGURATION
 

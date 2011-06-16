@@ -118,7 +118,7 @@ sub node {
     }
 
     return $self->resource( @_ )
-        if UNIVERSAL::isa( $_[0], 'RDF::Trine::Node::Resource' );
+        if UNIVERSAL::isa( $_[0], 'RDF::Trine::Node::Resource' ); 
 
     return $self->literal( @_ )
         if UNIVERSAL::isa( $_[0], 'RDF::Trine::Node::Literal' );

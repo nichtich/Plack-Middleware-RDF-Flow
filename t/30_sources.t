@@ -54,11 +54,30 @@ test_app
         code    => 200,
     }];
 
-my $src = MySource->new;
+my $source = sub { die "boo!"; };
+
+test_app 
+    name => 'Failing source',
+    app => RDF::Light->new( base => "http://example.com/", source => $source ),
+    tests => [{
+        request => [ 'GET', '/foo', [ 'Accept' => 'text/turtle' ] ],
+        content => 'boo!',
+        code    => 500,
+    }];
+
+test_app 
+    name => 'Empty source',
+    app => RDF::Light->new( base => "http://example.com/", source => sub { } ),
+    tests => [{
+        request => [ 'GET', '/foo', [ 'Accept' => 'text/turtle' ] ],
+        code    => 404,
+    }];
+
+$source = MySource->new;
 
 test_app 
     name => "Module as source",
-    app => RDF::Light->new( base => "http://example.com/", source => $src ),
+    app => RDF::Light->new( base => "http://example.com/", source => $source ),
     tests => [{
         request => [ 'GET', '/foo', [ 'Accept' => 'text/turtle' ] ],
         content => qr{foo> a.+Resource>},

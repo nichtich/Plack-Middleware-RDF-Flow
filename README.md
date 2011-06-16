@@ -32,10 +32,11 @@ the web interface (the "Downloads" button at the right) or clone via git:
     $ git clone git://github.com/nichtich/RDF-Light.git
     $ cd RDF-Light
 
-Once you have extracted all files in a directory you can run the example
-application from there:
+Once you have extracted all files in a directory you can run one of the example
+applications:
 
-    $ plackup -Ilib -r example/app.psgi 
+    $ plackup -Ilib -r examples/countries/app.psgi
+    $ plackup -Ilib -r examples/lobid/app.psgi
 
 Browse to http://localhost:5000 and you should get an HTML page with a list
 of country names as example. Have a look at the source code in the examples
