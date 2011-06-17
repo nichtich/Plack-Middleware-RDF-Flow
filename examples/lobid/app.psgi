@@ -1,11 +1,19 @@
 use strict;
 use warnings;
 
-use Plack::Builder;
-use Plack::Middleware::TemplateToolkit; # requires '0.12' from github
+#
+# This application shows how to use RDF::Light together with
+# Plack::Middleware::TemplateToolkit to create a simple RDF-based
+# web application. Actual data is retrieved as Linked data.
+#
+# The current state is work in progress to find out the right architecture.
+# 
 
-use RDF::Light;
-use RDF::Light::Graph;
+use Plack::Builder;
+use Plack::Middleware::TemplateToolkit; # requires '0.12' from github!
+
+use RDF::Light; # requires current developer version from github!
+use RDF::Light::Graph; 
 
 use Log::Contextual::WarnLogger;
 use Log::Contextual qw(:log :dlog), -default_logger 
@@ -16,7 +24,8 @@ use RDF::Trine::Parser;
 
 use URI::Escape;
 
-use constant ENVIRONMENT         => 'development';
+# TODO take from environment variable
+use constant ENVIRONMENT         => 'production';
 use constant ENABLE_DEBUG_PANELS => (ENVIRONMENT eq 'development');
 
 use Try::Tiny;
@@ -55,6 +64,8 @@ sub lobid_source {
     return $model;
 };
 
+# configuration
+
 my $base = 'http://lobid.org/organisation/';
 my $tt_app  = Plack::Middleware::TemplateToolkit->new( 
     INCLUDE_PATH => catfile(), INTERPOLATE => 1, pass_through => 0,
@@ -66,28 +77,35 @@ my $tt_app  = Plack::Middleware::TemplateToolkit->new(
 my $rdflight = RDF::Light->new( base => $base, source => \&lobid_source );
 
 builder {
+
+    # logging and debugging
     enable_if { ENABLE_DEBUG_PANELS } 'StackTrace';
     enable_if { ENABLE_DEBUG_PANELS } 'Debug';
     enable_if { ENABLE_DEBUG_PANELS } 'Lint';
     enable_if { ENABLE_DEBUG_PANELS } 'Runtime';
     enable_if { ENABLE_DEBUG_PANELS } 'ConsoleLogger';
-#     enable 'SimpleLogger';
+    enable_if { !ENABLE_DEBUG_PANELS } 'SimpleLogger';
     enable 'Log::Contextual', level => 'trace';
 
+    # Serve static files
     enable 'Static', root => catfile(), path => qr{\.css$};
 
+    # Serve linked data in RDF
     enable 'JSONP';
-    enable_if { $_[0]->{PATH_INFO} =~ /^\/DE-/ } # $rdflight 
+    enable_if { $_[0]->{PATH_INFO} =~ /^\/DE-/ }
         sub { $rdflight->app(shift); $rdflight->to_app; };
 
-    enable sub { # in lack of Plack::Middleware::Redirect
+    # In lack of Plack::Middleware::Redirect. This should be moved to a module
+    enable sub { 
         my $app = shift;
         sub {
             my $env = shift;
             my $req = Plack::Request->new( $env );
             my $isil = $req->query_parameters->{isil};
             if ( $isil ) {
-                my $redir = $req->base . uri_escape($isil);
+                my $base = $req->base; 
+                $base .= '/' unless $base =~ /\/$/; 
+                my $redir = $base . uri_escape($isil);
                 [ 302, [ Location => $redir ], 
                        [ "<html><body><a href=\"$redir\">redirect</a></body></html>"] ];
             } else {
@@ -95,6 +113,9 @@ builder {
             }
         }
     };
+
+    # this is the core application logic. Should be moved to a module.
+    # together with Plack::Middleware::TemplateToolkit it could be RDF::Light::Browser
 
     enable sub { 
         my $app = shift;
@@ -144,3 +165,8 @@ builder {
     $tt_app;
 };
 
+=head1 AUTHOR
+
+Jakob Voss
+
+=cut
