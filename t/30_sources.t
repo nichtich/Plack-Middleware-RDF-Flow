@@ -9,6 +9,7 @@ use Plack::Test;
 use Plack::Builder;
 use RDF::Light;
 use RDF::Light::Source;
+use RDF::Light::Source::Union;
 use RDF::Trine::Model;
 use RDF::Trine qw(iri statement);
 
@@ -41,7 +42,7 @@ test_app
     app => builder {
         enable "+RDF::Light", 
             base => "http://example.com/", 
-            source => [ $example_model, \&dummy_source ];
+            source => union( $example_model, \&dummy_source );
         $not_found;
     },
     tests => [{

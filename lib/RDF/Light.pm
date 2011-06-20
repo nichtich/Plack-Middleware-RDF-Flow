@@ -65,6 +65,8 @@ sub prepare_app {
     ref $self->formats eq 'HASH'
         or carp 'formats must be a hash reference';
 
+    $self->source( RDF::Light::Source::source($self->source) );
+
     $self->via_param(1) unless defined $self->via_param;
 }
 
@@ -115,18 +117,17 @@ sub retrieve {
     my $self = shift;
     my $env  = shift;
 
-    my $sources = $self->source or return;
-    $sources = [ $sources ] unless ref $sources and ref $sources eq 'ARRAY';
+    my $src = $self->source or return;
 
-    foreach my $src (@$sources) {
+#    foreach my $src (@$sources) {
         my $rdf = try {
-            if ( UNIVERSAL::isa( $src, 'CODE' ) ) {
-                $src->($env);
-            } elsif ( UNIVERSAL::isa( $src, 'RDF::Trine::Model' ) ) {
-                $src->bounded_description( iri($env->{'rdflight.uri'}) );
-            } elsif ( UNIVERSAL::can( $src, 'retrieve' ) ) {
+#            if ( UNIVERSAL::isa( $src, 'CODE' ) ) {
+#                $src->($env);
+#            } elsif ( UNIVERSAL::isa( $src, 'RDF::Trine::Model' ) ) {
+#                $src->bounded_description( iri($env->{'rdflight.uri'}) );
+#            } elsif ( UNIVERSAL::can( $src, 'retrieve' ) ) {
                 $src->retrieve( $env );
-            }
+#            }
         } catch {
             $_ =~ s/ at.+ line \d+.?\n?//; # TODO: is there a cleaner way?
             $env->{'rdflight.error'} = $_;
@@ -142,7 +143,7 @@ sub retrieve {
         } else {
             $env->{'rdflight.error'} = 'Invalid source';
         }
-    }    
+#    }    
     
     return;
 }

@@ -1,4 +1,15 @@
 use strict;
-use Test::More tests => 1;
 
-BEGIN { use_ok 'RDF::Light' }
+my @modules;
+
+BEGIN { @modules = qw(
+RDF::Light
+RDF::Light::Graph
+RDF::Light::Source
+RDF::Light::Source::Union 
+RDF::Light::Source::Cascade
+); }
+
+use Test::More tests => scalar @modules;
+
+use_ok($_) for @modules;
