@@ -5,17 +5,25 @@ package RDF::Light::Source;
 use Plack::Request;
 use RDF::Trine qw(iri statement);
 use Scalar::Util qw(blessed);
+use RDF::Light::Source::Union;
+use RDF::Light::Source::Cascade;
+use RDF::Light::Source::Pipeline;
 
 use parent 'Exporter';
 use Carp;
+
 our @EXPORT = qw(dummy_source);
-our @EXPORT_OK = qw(source is_source dummy_source);
+our @EXPORT_OK = qw(source is_source dummy_source is_empty_source union cascade pipeline);
+
+use overload '&{}' => sub { return shift->call(@_) }, fallback => 1;
+
+our $PREVIOUS = source( sub { shift->{'rdflight.data'} } );
 
 our $rdf_type      = iri('http://www.w3.org/1999/02/22-rdf-syntax-ns#type');
 our $rdfs_Resource = iri('http://www.w3.org/2000/01/rdf-schema#Resource');
 
 sub new {
-    my $class = 'RDF::Light::Source';
+    my $class = ($_[0] and not ref $_[0]) ? shift : 'RDF::Light::Source';
 
 	my $code = sub { };
 
@@ -44,12 +52,26 @@ sub new {
 	bless { code => $code }, $class;
 }
 
-sub retrieve {
+sub call {
     my ($self, $env) = @_;
-    $self->{code}->( $env );
+    return $self->{code}->( $env );
+}
+
+# duck-type Plack::Component
+sub prepare_app { return }
+
+# duck-type Plack::Component
+sub to_app {
+    my $self = shift;
+    $self->prepare_app;
+    return sub { $self->call(@_) };
 }
 
 sub source { new(@_) }
+
+sub union    { RDF::Light::Source::Union->new( @_ ) }
+sub cascade  { RDF::Light::Source::Cascade->new( @_ ) }
+sub pipeline { RDF::Light::Source::Pipeline->new( @_ ) }
 
 sub is_source {
     my $s = shift;
@@ -57,13 +79,16 @@ sub is_source {
 	    ($s->isa('RDF::Light::Source') or $s->isa('RDF::Trine::Model'));
 }
 
-sub pipe {
+sub has_content { # TODO: document this
+    my $rdf = shift;
+    return unless blessed $rdf;
+    return ($rdf->isa('RDF::Trine::Model') and $rdf->size > 0) ||
+		   ($rdf->isa('RDF::Trine::Iterator') and $rdf->peek);
+}
+
+sub pipe_to { # TODO: document this
     my ($self, $next) = @_;
-	return source( sub {
-	    my $res = $self->retrieve(shift);
-		return unless defined $res;
-		# TODO: if not empty: retrieve next and create union
-	} );
+	return RDF::Light::Source::Pipeline->new( $self, $next );
 }
 
 sub dummy_source {
@@ -74,6 +99,19 @@ sub dummy_source {
     $model->add_statement( statement( iri($uri), $rdf_type, $rdfs_Resource ) );
 
     return $model;
+}
+
+sub previous { $RDF::Light::Source::PREVIOUS; }
+
+# Helper method, should be added to RDF::Trine::Model
+sub add_iterator {
+    my ($model, $iter) = @_;
+    
+    $model->begin_bulk_ops;
+    while (my $st = $iter->next) { 
+        $model->add_statement( $st ); 
+    }
+    $model->end_bulk_ops;
 }
 
 1;
@@ -94,7 +132,7 @@ instances of RDF::Light::Source, and instances of RDF::Trine::Model.
     $src = RDF::Light::Source->new( @other_sources );
 
     # retrieve RDF data
-	$rdf = $src->retrieve( $env );
+	$rdf = $src->call( $env );
 	$rdf = $src->( $env ); # use source as code reference
 
     # code reference as source
@@ -120,7 +158,7 @@ instances of RDF::Light::Source, and instances of RDF::Trine::Model.
     package MySource;
     use parent 'RDF::Light::Source';
 
-    sub retrieve {
+    sub call {
 	    my ($self, $env) = shift;
 		# ..your logic here...
 	}

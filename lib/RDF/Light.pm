@@ -31,8 +31,9 @@ RDF::Light - Simplified Linked Data handling
 
 use Try::Tiny;
 use Plack::Request;
-use RDF::Trine qw(iri statement);
+use RDF::Trine qw(0.135 iri statement);
 use RDF::Trine::Serializer;
+use Encode;
 use Carp;
 
 use RDF::Light::Source;
@@ -101,6 +102,7 @@ sub call {
         }
 
         if ( defined $rdf_data ) {
+            $rdf_data = encode_utf8($rdf_data);
             return [ 200, [ 'Content-Type' => $type ], [ $rdf_data ] ];
         }
     }
@@ -125,8 +127,8 @@ sub retrieve {
 #                $src->($env);
 #            } elsif ( UNIVERSAL::isa( $src, 'RDF::Trine::Model' ) ) {
 #                $src->bounded_description( iri($env->{'rdflight.uri'}) );
-#            } elsif ( UNIVERSAL::can( $src, 'retrieve' ) ) {
-                $src->retrieve( $env );
+#            } elsif ( UNIVERSAL::can( $src, 'call' ) ) {
+                $src->call( $env );
 #            }
         } catch {
             $_ =~ s/ at.+ line \d+.?\n?//; # TODO: is there a cleaner way?
@@ -354,6 +356,8 @@ and path. Query parameters are ignored.
 =head2 SEE ALSO
 
 See also L<RDF::Light::Graph>, which is bundled with this module.
+
+To test you applications you should use L<Test::RDF>.
 
 =head2 ACKNOWLEDGEMENTS
 

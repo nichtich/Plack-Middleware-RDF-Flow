@@ -1,5 +1,12 @@
 # Change file for RDF::Light
 
-0.01 Tue 2011-05-31
+0.11 2011-06-28
+    Added Pipeline and fixes
+    renamed 'retrieve' to 'call' and added Plack's method
+
+0.10 2011-06-21
+    Sources and extended Graph syntax
+
+0.01 2011-05-31
     Inital public version
 

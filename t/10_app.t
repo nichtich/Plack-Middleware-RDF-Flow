@@ -68,4 +68,6 @@ test_app
         code    => 404,
     }];
 
+# TODO: test utf8!
+
 done_testing;

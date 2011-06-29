@@ -3,7 +3,6 @@ use warnings;
 package RDF::Light::Source::Union;
 
 use parent 'RDF::Light::Source';
-use Carp ();
 
 our @EXPORT = qw(union);
 
@@ -12,20 +11,20 @@ sub new {
 	bless [ map { RDF::Light::Source::source($_) } @_ ], $class;
 }
 
-sub retrieve { # TODO: try/catch errors?
+sub call { # TODO: try/catch errors?
     my ($self, $env) = @_;
 
     my $result;
 
     if ( @$self == 1 ) {
-        $result = $self->[0]->retrieve( $env );
+        $result = $self->[0]->call( $env );
     } elsif( @$self > 1 ) {
         $result = RDF::Trine::Model->temporary_model;
         foreach my $src ( @$self ) { # TODO: parallel processing?
-		    my $rdf = $src->retrieve( $env );
+		    my $rdf = $src->call( $env );
 			next unless defined $rdf;
 			$rdf = $rdf->as_stream unless $rdf->isa('RDF::Trine::Iterator');
-            $result->add_iterator( $rdf );
+            RDF::Light::Source::add_iterator( $result, $rdf );
         }
     }
 
@@ -49,10 +48,10 @@ It exports the function 'union' as constructor shortcut.
 
 	$src = union(@sources);                            # shortcut
     $src = RDF::Light::Source::Union->new( @sources ); # explicit
-	$rdf = $src->retrieve( $env );
+	$rdf = $src->call( $env );
 
 =head2 SEE ALSO
 
-L<RDF::Light::Source::Cascade>
+L<RDF::Light::Source::Cascade>, L<RDF::Light::Source::Pipeline>
 
 =cut

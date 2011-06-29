@@ -8,8 +8,7 @@ use Test::More;
 use Plack::Test;
 use Plack::Builder;
 use RDF::Light;
-use RDF::Light::Source;
-use RDF::Light::Source::Union;
+use RDF::Light::Source qw(union dummy_source);
 use RDF::Trine::Model;
 use RDF::Trine qw(iri statement);
 
@@ -91,7 +90,7 @@ package MySource;
 use base 'RDF::Light::Source';
 use RDF::Light::Source;
 
-sub new { bless {}, shift; }
-sub retrieve { dummy_source( $_[1] ) }
+#sub new { bless {}, shift; }
+sub call { dummy_source( $_[1] ) }
 
 1;

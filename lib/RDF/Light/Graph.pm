@@ -135,14 +135,26 @@ sub add {
     if (UNIVERSAL::isa($add, 'RDF::Trine::Statement')) {
         $self->model->add_statement( $add );
     } elsif (UNIVERSAL::isa($add, 'RDF::Trine::Iterator')) {
-        # Is there no RDF::Trine::Model::add_iterator ??
-        while (my $st = $add->next) {
-            $self->add( $st );
-        }
+        _add_iterator( $self->model, $add ); 
     } elsif (UNIVERSAL::isa($add, 'RDF::Trine::Model')) {
         $self->add( $add->as_stream ); # TODO: test this
     }
+
+    # TODO: add triple with subject, predicate in custom form and object
+    # as custom form, blank, or literal
 }
+
+# Is there no RDF::Trine::Model::add_iterator ??
+sub _add_iterator {
+    my ($model, $iter) = @_;
+    
+    $model->begin_bulk_ops;
+    while (my $st = $iter->next) { 
+        $model->add_statement( $st ); 
+    }
+    $model->end_bulk_ops;
+}
+
 
 sub AUTOLOAD {
     my $self = shift;
