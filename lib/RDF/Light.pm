@@ -33,6 +33,7 @@ use Try::Tiny;
 use Plack::Request;
 use RDF::Trine qw(0.135 iri statement);
 use RDF::Trine::Serializer;
+use RDF::Trine::NamespaceMap;
 use Encode;
 use Carp;
 
@@ -40,7 +41,7 @@ use RDF::Light::Source;
 
 use parent 'Plack::Middleware';
 #use parent 'RDF::Light::Source';
-use Plack::Util::Accessor qw(source base formats via_param via_extension);
+use Plack::Util::Accessor qw(source base formats via_param via_extension namespaces);
 
 use parent 'Exporter';
 our @EXPORT_OK = qw(guess_serialization);
@@ -69,6 +70,10 @@ sub prepare_app {
     $self->source( RDF::Light::Source::source($self->source) );
 
     $self->via_param(1) unless defined $self->via_param;
+
+    if (!$self->namespaces) {
+        $self->namespaces( RDF::Trine::NamespaceMap->new );
+    }
 }
 
 sub call {
@@ -182,7 +187,8 @@ sub guess_serialization {
     if ($format) {
         my $name = $possible_formats->{$format};
         if ($name) { try {
-            $serializer = RDF::Trine::Serializer->new( $name );
+            my $namespaces = $self->namespaces;
+            $serializer = RDF::Trine::Serializer->new( $name, namespaces => $namespaces );
             ($type) = $serializer->media_types;
         } } # TODO: catch if unknown format or format not available
     } else {
