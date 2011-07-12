@@ -18,7 +18,7 @@ sub foo { model( RDF::Light::uri( shift ), 'x:a', 'y:bar' ); };
 my $src = RDF::Light::Source->new( \&foo );
 
 my $env = query('/hello'); 
-my $rdf = $src->call($env);
+my $rdf = $src->retrieve($env);
 
 isa_ok( $rdf, 'RDF::Trine::Model' );
 # use RDF::Dumper; print rdfdump($rdf)."\n";

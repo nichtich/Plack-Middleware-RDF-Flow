@@ -26,7 +26,7 @@ my $nil   = source sub { undef; };
 
 $src = RDF::Light::Source::Union->new( $empty, $foo, $foo, $nil, undef, \&bar );
 
-$rdf = $src->call( query('/foo') );
+$rdf = $src->retrieve( query('/foo') );
 ok($rdf);
 
 isomorph_graphs( $rdf, model(qw(
@@ -34,31 +34,32 @@ http://example.org/foo x:a y:foo
 http://example.org/foo x:a y:bar)), 'union' );
 
 $src = RDF::Light::Source::Cascade->new( $empty, $foo, \&bar );
-$rdf = $src->call( query('/foo') );
+$rdf = $src->retrieve( query('/foo') );
 isomorph_graphs( $rdf, model(qw(http://example.org/foo x:a y:foo)), 'cascade' );
 
 $src = cascade( $empty, \&bar, $foo );
-$rdf = $src->call( query('/foo') );
+$rdf = $src->retrieve( query('/foo') );
 isomorph_graphs( $rdf, model(qw(http://example.org/foo x:a y:bar)), 'cascade' );
 
 $env = query('/hi');
 $src = pipeline( $foo, $bar );
-$rdf = $src->call( $env );
+$rdf = $src->retrieve( $env );
 isomorph_graphs( $rdf, model(qw(http://example.org/hi x:a y:bar)), 'pipeline' );
 is( $rdf, $env->{'rdflight.data'}, 'pipeline sets rdflight.data' );
 
 $src = pipeline( $foo, $bar, $empty );
-$rdf = $src->call( query('/hi') );
+$rdf = $src->retrieve( query('/hi') );
 isomorph_graphs( $rdf, model(), 'empty source nils pipeline' );
 
 # pipeline as conditional: if $foo has content then union of $foo and $bar
 $src = $foo->pipe_to( union( previous, $bar ) );
-$rdf = $src->call( query('/abc') );
+$rdf = $src->retrieve( query('/abc') );
 isomorph_graphs( $rdf, model(qw(
 http://example.org/abc x:a y:foo 
 http://example.org/abc x:a y:bar)), 'conditional' );
 
-$rdf = $src->call( query('/1') );
+$rdf = $src->retrieve( query('/1') );
+    
 isomorph_graphs( $rdf, model(), 'conditional' );
 
 done_testing;

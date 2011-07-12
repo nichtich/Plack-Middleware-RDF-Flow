@@ -13,11 +13,11 @@ sub new {
 	bless [ map { RDF::Light::Source::source($_) } @_ ], $class;
 }
 
-sub call { # TODO: try/catch errors?
+sub retrieve { # TODO: try/catch errors?
     my ($self, $env) = @_;
 
     foreach my $src ( @$self ) {
-        my $rdf = $src->call( $env );
+        my $rdf = $src->retrieve( $env );
 
 		next unless defined $rdf;
 		if ( blessed $rdf and $rdf->isa('RDF::Trine::Model') ) {
@@ -49,7 +49,7 @@ sequence of sources. It exports the function 'cascade' as constructor shortcut.
 
 	$src = cascade(@sources);                            # shortcut
     $src = RDF::Light::Source::Cascade->new( @sources ); # explicit
-	$rdf = $src->call( $env );
+	$rdf = $src->retrieve( $env );
 
 =head2 SEE ALSO
 

@@ -11,11 +11,11 @@ sub new {
 	bless [ map { RDF::Light::Source::source($_) } @_ ], $class;
 }
 
-sub call {
+sub retrieve {
     my ($self, $env) = @_;
 
     foreach my $src ( @$self ) {
-        my $rdf = $src->call( $env );
+        my $rdf = $src->retrieve( $env );
         $env->{'rdflight.data'} = $rdf;
 		return $rdf unless RDF::Light::Source::has_content( $rdf );
     }
@@ -47,7 +47,7 @@ conditional branch. To pipe one source after another, you can also use the
 
 	$src = pipeline( @sources );                           # shortcut
     $src = RDF::Light::Source::Pipeline->new( @sources );  # explicit
-	$rdf = $src->call( $env );
+	$rdf = $src->retrieve( $env );
     $rdf == $env->{'rdflight.data'};                       # always true
 
     # pipeline as conditional: if $s1 has content then union of $1 and $2

@@ -49,7 +49,6 @@ independently. Some of them may get renamed or merged to existing Perl modules:
 
 * RDF::Light         - a PSGI Middleware for Linked Data
 * RDF::Light::Source - a method to combine sources of RDF data
-* RDF::Light::Graph  - a wrapper to RDF::Trine to access RDF data
 
 This list is not complete or stable. If you have suggestions or comments, you
 are welcome to [submit an issue](https://github.com/nichtich/RDF-Light/issues)!

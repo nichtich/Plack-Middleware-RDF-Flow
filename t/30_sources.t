@@ -91,6 +91,6 @@ use base 'RDF::Light::Source';
 use RDF::Light::Source;
 
 #sub new { bless {}, shift; }
-sub call { dummy_source( $_[1] ) }
+sub retrieve { dummy_source( $_[1] ) }
 
 1;

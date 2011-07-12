@@ -15,7 +15,7 @@ use Carp;
 our @EXPORT = qw(dummy_source);
 our @EXPORT_OK = qw(source is_source dummy_source is_empty_source union cascade pipeline);
 
-use overload '&{}' => sub { return shift->call(@_) }, fallback => 1;
+use overload '&{}' => sub { return shift->retrieve(@_) }, fallback => 1;
 
 our $PREVIOUS = source( sub { shift->{'rdflight.data'} } );
 
@@ -52,7 +52,7 @@ sub new {
 	bless { code => $code }, $class;
 }
 
-sub call {
+sub retrieve {
     my ($self, $env) = @_;
     return $self->{code}->( $env );
 }
@@ -64,7 +64,7 @@ sub prepare_app { return }
 sub to_app {
     my $self = shift;
     $self->prepare_app;
-    return sub { $self->call(@_) };
+    return sub { $self->retrieve(@_) };
 }
 
 sub source { new(@_) }
@@ -132,7 +132,7 @@ instances of RDF::Light::Source, and instances of RDF::Trine::Model.
     $src = RDF::Light::Source->new( @other_sources );
 
     # retrieve RDF data
-	$rdf = $src->call( $env );
+	$rdf = $src->retrieve( $env );
 	$rdf = $src->( $env ); # use source as code reference
 
     # code reference as source
@@ -158,7 +158,7 @@ instances of RDF::Light::Source, and instances of RDF::Trine::Model.
     package MySource;
     use parent 'RDF::Light::Source';
 
-    sub call {
+    sub retrieve {
 	    my ($self, $env) = shift;
 		# ..your logic here...
 	}

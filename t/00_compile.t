@@ -4,7 +4,6 @@ my @modules;
 
 BEGIN { @modules = qw(
 RDF::Light
-RDF::Light::Graph
 RDF::Light::Source
 RDF::Light::Source::Union 
 RDF::Light::Source::Cascade

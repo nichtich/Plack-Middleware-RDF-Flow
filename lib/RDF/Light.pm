@@ -132,8 +132,8 @@ sub retrieve {
 #                $src->($env);
 #            } elsif ( UNIVERSAL::isa( $src, 'RDF::Trine::Model' ) ) {
 #                $src->bounded_description( iri($env->{'rdflight.uri'}) );
-#            } elsif ( UNIVERSAL::can( $src, 'call' ) ) {
-                $src->call( $env );
+#            } elsif ( UNIVERSAL::can( $src, 'retrieve' ) ) {
+                $src->retrieve( $env );
 #            }
         } catch {
             $_ =~ s/ at.+ line \d+.?\n?//; # TODO: is there a cleaner way?
