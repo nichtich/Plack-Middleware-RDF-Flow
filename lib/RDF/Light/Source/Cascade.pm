@@ -1,12 +1,17 @@
 use strict;
 use warnings;
 package RDF::Light::Source::Cascade;
+# ABSTRACT: Returns the first non-empty response of a sequence of sources
+
+use Log::Contextual::WarnLogger;
+use Log::Contextual qw(:log), -default_logger 
+    => Log::Contextual::WarnLogger->new({ env_prefix => __PACKAGE__ });
 
 use parent 'RDF::Light::Source';
+our @EXPORT = qw(cascade);
+
 use Scalar::Util 'blessed';
 use Carp 'croak';
-
-our @EXPORT = qw(cascade);
 
 sub new {
     my $class = shift;
@@ -15,6 +20,8 @@ sub new {
 
 sub retrieve { # TODO: try/catch errors?
     my ($self, $env) = @_;
+
+    log_trace { __PACKAGE__ . '::retrieve with ' . scalar @$self . ' sources' };
 
     foreach my $src ( @$self ) {
         my $rdf = $src->retrieve( $env );

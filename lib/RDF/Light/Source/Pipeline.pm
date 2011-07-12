@@ -1,9 +1,13 @@
 use strict;
 use warnings;
 package RDF::Light::Source::Pipeline;
+# ABSTRACT: Pipelines multiple sources
+
+use Log::Contextual::WarnLogger;
+use Log::Contextual qw(:log), -default_logger 
+    => Log::Contextual::WarnLogger->new({ env_prefix => __PACKAGE__ });
 
 use parent 'RDF::Light::Source';
-
 our @EXPORT = qw(pipeline previous);
 
 sub new {
@@ -13,6 +17,8 @@ sub new {
 
 sub retrieve {
     my ($self, $env) = @_;
+
+    log_trace { __PACKAGE__ . '::retrieve with ' . scalar @$self . ' sources' };
 
     foreach my $src ( @$self ) {
         my $rdf = $src->retrieve( $env );

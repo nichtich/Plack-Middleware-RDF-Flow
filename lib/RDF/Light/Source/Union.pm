@@ -1,9 +1,13 @@
 use strict;
 use warnings;
 package RDF::Light::Source::Union;
+# ABSTRACT: Returns the union of multiple sources
+
+use Log::Contextual::WarnLogger;
+use Log::Contextual qw(:log), -default_logger 
+    => Log::Contextual::WarnLogger->new({ env_prefix => __PACKAGE__ });
 
 use parent 'RDF::Light::Source';
-
 our @EXPORT = qw(union);
 
 sub new {
@@ -13,8 +17,9 @@ sub new {
 
 sub retrieve { # TODO: try/catch errors?
     my ($self, $env) = @_;
-
     my $result;
+
+    log_trace { __PACKAGE__ . '::retrieve with ' . scalar @$self . ' sources' };
 
     if ( @$self == 1 ) {
         $result = $self->[0]->retrieve( $env );

@@ -37,13 +37,10 @@ use RDF::Trine::NamespaceMap;
 use Encode;
 use Carp;
 
-use RDF::Light::Source;
+use parent 'Plack::Middleware', 'RDF::Light::Source', 'Exporter';
 
-use parent 'Plack::Middleware';
-#use parent 'RDF::Light::Source';
 use Plack::Util::Accessor qw(source base formats via_param via_extension namespaces);
 
-use parent 'Exporter';
 our @EXPORT_OK = qw(guess_serialization);
 
 our %rdf_formats = (
@@ -361,7 +358,7 @@ and path. Query parameters are ignored.
 
 =head2 SEE ALSO
 
-See also L<RDF::Light::Graph>, which is bundled with this module.
+See also L<RDF::Lazy>.
 
 To test you applications you should use L<Test::RDF>.
 
