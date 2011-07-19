@@ -8,17 +8,21 @@ use Test::More;
 use Plack::Test;
 use Plack::Builder;
 use RDF::Light;
-use RDF::Light::Source;
+use RDF::Source qw(source_uri dummy_source);
 use Data::Dumper;
+
+#use Log::Contextual::SimpleLogger;
+#use Log::Contextual qw( :log ),
+#     -logger => Log::Contextual::SimpleLogger->new({ levels => [qw(trace)]});
 
 my $not_found = sub { [404,['Content-Type'=>'text/plain'],['Not found']] };
 
 my $uri_not_found = sub {
-    [ 404, ['Content-Type'=>'text/plain'], [ RDF::Light::uri(shift) ] ];
+    [ 404, ['Content-Type'=>'text/plain'], [ source_uri(shift) ] ];
 };
 
 my $app = builder {
-    enable "+RDF::Light", source => \&dummy_source;
+    enable 'RDF::Light', source => \&dummy_source;
     $uri_not_found;
 };
 
@@ -41,7 +45,7 @@ test_app
 
 for my $base ( ('http://example.org/', '', 'my:') ) {
     $app = builder {
-        enable "+RDF::Light", source => \&dummy_source, base => $base;
+        enable 'RDF::Light', source => \&dummy_source, base => $base;
         $uri_not_found;
     };
 
@@ -64,3 +68,13 @@ for my $base ( ('http://example.org/', '', 'my:') ) {
 }
 
 done_testing;
+
+__END__
+use HTTP::Request::Common;
+
+test_psgi $app, sub { 
+    my $app = shift;
+    my $res = $app->(GET '/example');
+    is_deeply $res, [404,['Content-Type' => 'text/plain']['Not found'];
+}
+

@@ -6,7 +6,7 @@ use TestPlackApp;
 
 use Test::More;
 use RDF::Light;
-use RDF::Light::Source;
+use RDF::Source qw(dummy_source);
 use RDF::Trine::NamespaceMap;
 
 my $app = RDF::Light->new( 

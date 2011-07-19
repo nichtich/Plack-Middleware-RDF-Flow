@@ -6,7 +6,7 @@ use TestPlackApp;
 
 use Test::More;
 use RDF::Light;
-use RDF::Light::Source;
+use RDF::Source qw(dummy_source);
 
 my $app = RDF::Light->new( 
     source => \&dummy_source

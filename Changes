@@ -1,5 +1,8 @@
 # Change file for RDF::Light
 
+0.15 2011-07-19
+    removed RDF::Source
+
 0.13 2011-07-12
     removed RDF::Light::Graph
     renamed 'call' back to 'retrieve'

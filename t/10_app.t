@@ -10,12 +10,13 @@ use Plack::Builder;
 use Data::Dumper;
 use Try::Tiny;
 use RDF::Light;
-use RDF::Light::Source;
+
+use RDF::Source qw(dummy_source);
 
 my $not_found = sub { [404,['Content-Type'=>'text/plain'],['Not found']] };
 
 my $app = builder {
-    enable "+RDF::Light", source => \&dummy_source;
+    enable 'RDF::Light', source => sub { dummy_source @_ };
     $not_found;
 };
 

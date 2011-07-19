@@ -1,45 +1,25 @@
 use strict;
 use warnings;
 package RDF::Light;
+#ABSTRACT: Simplified Linked Data provider
 
-=head1 NAME
-
-RDF::Light - Simplified Linked Data handling
-
-=head1 SYNOPSIS
-
-    use Plack::Builder;
-    use Plack::Request;
-    use RDF::Light;
-
-    my $model = RDF::Trine::Model->new( ... );
-
-    my $app = sub {
-        my $env = shift;
-        my $uri = RDF::Light::uri( $env );
-
-        [ 404, ['Content-Type'=>'text/plain'], 
-               ["URI $uri not found or not requested as RDF"] ];
-    };
-
-    builder {
-        enable "+RDF::Light", source => $model;
-        $app;
-    }
-
-=cut
+use Log::Contextual::WarnLogger;
+use Log::Contextual qw(:log), -default_logger
+    => Log::Contextual::WarnLogger->new({ env_prefix => __PACKAGE__ });
 
 use Try::Tiny;
 use Plack::Request;
 use RDF::Trine qw(0.135 iri statement);
 use RDF::Trine::Serializer;
 use RDF::Trine::NamespaceMap;
+use RDF::Source;
 use Encode;
 use Carp;
 
-use parent 'Plack::Middleware', 'RDF::Light::Source', 'Exporter';
+use parent 'Exporter', 'Plack::Middleware';
 
-use Plack::Util::Accessor qw(source base formats via_param via_extension namespaces);
+use Plack::Util::Accessor qw(source base formats via_param via_extension 
+    namespaces pass_through empty_base);
 
 our @EXPORT_OK = qw(guess_serialization);
 
@@ -64,13 +44,12 @@ sub prepare_app {
     ref $self->formats eq 'HASH'
         or carp 'formats must be a hash reference';
 
-    $self->source( RDF::Light::Source::source($self->source) );
+    $self->source( RDF::Source->new( $self->source ) );
 
     $self->via_param(1) unless defined $self->via_param;
 
-    if (!$self->namespaces) {
-        $self->namespaces( RDF::Trine::NamespaceMap->new );
-    }
+    $self->namespaces( RDF::Trine::NamespaceMap->new )
+        unless $self->namespaces;
 }
 
 sub call {
@@ -82,14 +61,15 @@ sub call {
 
     my ($type, $serializer) = $self->guess_serialization( $env );
 
-    $env->{'rdflight.uri'} = $self->uri( $env )
-        unless defined $env->{'rdflight.uri'};
+    # TODO: put uri into another module?
+    $env->{'rdfsource.uri'} = $self->uri( $env )
+        unless defined $env->{'rdfsource.uri'};
 
     if ( $type ) {
         $env->{'rdflight.type'}       = $type;
         $env->{'rdflight.serializer'} = $serializer;
 
-        my $rdf = $self->retrieve( $env );
+        my $rdf = $self->_retrieve( $env );
 
         if ( $env->{'rdflight.error'} ) {
             return [ 500, [ 'Content-Type' => 'text/plain' ], [ $env->{'rdflight.error'} ] ];
@@ -104,9 +84,12 @@ sub call {
         }
 
         if ( defined $rdf_data ) {
-            $rdf_data = encode_utf8($rdf_data);
+            $rdf_data = encode('utf8',$rdf_data);
             return [ 200, [ 'Content-Type' => $type ], [ $rdf_data ] ];
         }
+    } elsif ( $self->pass_through ) {
+        my $rdf = $self->_retrieve( $env );
+        $env->{'rdfsource.data'} = $rdf;
     }
 
     # pass through if no/unknown serializer or empty source (URI not found) or error 
@@ -117,39 +100,50 @@ sub call {
     }
 }
 
-sub retrieve {
-    my $self = shift;
-    my $env  = shift;
+=head2 retrieve ( $env )
 
-    my $src = $self->source or return;
+Given a L<PSGI> environment, this method queries the source(s) for a 
+requested URI (if given) and either returns undef or a non-empty
+L<RDF::Trine::Model> or L<RDF::Trine::Iterator>. On error this method
+does not die but sets the environment variable rdflight.error. Note that
+if there are multiple source, there may be both an error, and a return 
+value.
 
-#    foreach my $src (@$sources) {
-        my $rdf = try {
-#            if ( UNIVERSAL::isa( $src, 'CODE' ) ) {
-#                $src->($env);
-#            } elsif ( UNIVERSAL::isa( $src, 'RDF::Trine::Model' ) ) {
-#                $src->bounded_description( iri($env->{'rdflight.uri'}) );
-#            } elsif ( UNIVERSAL::can( $src, 'retrieve' ) ) {
-                $src->retrieve( $env );
-#            }
-        } catch {
-            $_ =~ s/ at.+ line \d+.?\n?//; # TODO: is there a cleaner way?
-            $env->{'rdflight.error'} = $_;
-            RDF::Trine::Model->new;
-        };
+=cut
+sub _retrieve {
+    my ($self,$env) = @_;
 
-        return unless defined $rdf;
+    # TODO: put uri into another module?
+    $env->{'rdfsource.uri'} = $self->uri( $env )
+        unless defined $env->{'rdfsource.uri'};
 
-        if ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Model' ) ) { 
-            return $rdf if $rdf->size > 0;
-        } elsif ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Iterator' ) ) {
-            return $rdf if $rdf->peek;
-        } else {
-            $env->{'rdflight.error'} = 'Invalid source';
-        }
-#    }    
-    
-    return;
+    if (!$self->empty_base and $env->{'rdfsource.uri'} eq ($self->base||'')) {
+        log_trace { "empty base" };
+        return RDF::Trine::Model->new;
+    }
+
+    my $src = $self->source;
+
+    log_trace { 'Retrieve from source' };
+    my $rdf = $src->retrieve( $env );
+    #  my $rdf = try {
+    #   my $rdf = $src->retrieve( $env );
+        #} catch {
+        #    $_ =~ s/ at.+ line \d+.?\n?//; # TODO: is there a cleaner way?
+        #    $env->{'rdflight.error'} = $_;
+        #    RDF::Trine::Model->new;
+        #};
+
+        #return unless defined $rdf;
+
+    #   if ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Model' ) ) { 
+    #       $rdf if $rdf->size > 0;
+    #   } elsif ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Iterator' ) ) {
+    #       return $rdf if $rdf->peek;
+    #   } else {
+    #       $env->{'rdflight.error'} = 'Invalid source';
+    #   }
+    return $rdf;
 }
 
 sub guess_serialization {
@@ -199,13 +193,15 @@ sub guess_serialization {
         }
     }
 
+    log_trace { "Guessed serialization $type with " . ref($serializer) };
+
     return ($type, $serializer);
 }
 
 sub uri { 
     my $env = shift;
 
-    return $env->{'rdflight.uri'} if defined $env->{'rdflight.uri'};
+    return $env->{'rdfsource.uri'} if defined $env->{'rdfsource.uri'};
 
     my ($base, $self); # TODO: support as second argument
 
@@ -224,6 +220,30 @@ sub uri {
     $path =~ s/^\///;
     return $base.$path;
 }
+
+=head1 SYNOPSIS
+
+    use Plack::Builder;
+    use Plack::Request;
+
+    my $model = RDF::Trine::Model->new( ... );
+
+    my $app = sub {
+        my $env = shift;
+        my $uri = RDF::Source::uri( $env );
+
+        [ 404, ['Content-Type'=>'text/plain'], 
+               ["URI $uri not found or not requested as RDF"] ];
+    };
+
+    builder {
+        enable 'RDF::Light',
+            source => $model;
+        $app;
+    }
+
+=cut
+
 
 =head1 INTRODUCTION
 
@@ -265,15 +285,6 @@ Create a serialization.
 
 Creates a new object.
 
-=head2 retrieve ( $env )
-
-Given a L<PSGI> environment, this method queries the source(s) for a 
-requested URI (if given) and either returns undef or a non-empty
-L<RDF::Trine::Model> or L<RDF::Trine::Iterator>. On error this method
-does not die but sets the environment variable rdflight.error. Note that
-if there are multiple source, there may be both an error, and a return 
-value.
-
 =head2 CONFIGURATION
 
 =over 4
@@ -281,11 +292,11 @@ value.
 =item source
 
 Sets a L<RDF::Trine::Model> or a code reference as RDF source that returns a 
-Model or Iterator (see L<RDF::Light::Source>) to query from. You can also set 
+Model or Iterator (see L<RDF::Source>) to query from. You can also set 
 an array reference with a list of multiple sources, which are cascaded.
 
 For testing you can use the function dummy_source that always returns a single
-triple and is exported by RDF::Light::Source.
+triple and can be exported by RDF::Source.
 
 =item base
 
