@@ -5,11 +5,11 @@ use lib 't';
 use TestPlackApp;
 
 use Test::More;
-use RDF::Light;
-use RDF::Source qw(dummy_source);
+use Plack::Middleware::RDF::Flow;
+use RDF::Flow::Dummy;
 
-my $app = RDF::Light->new( 
-    source => \&dummy_source
+my $app = Plack::Middleware::RDF::Flow->new( 
+    source => RDF::Flow::Dummy->new
 );
 
 test_app
@@ -21,8 +21,8 @@ test_app
         headers => { 'Content-Type' => 'application/turtle' },
     }];
 
-$app = RDF::Light->new( 
-    source => \&dummy_source,
+$app = Plack::Middleware::RDF::Flow->new(
+    source  => RDF::Flow::Dummy->new,
     formats => { rdf => 'rdfxml' }
 );
 
@@ -35,9 +35,9 @@ test_app
         request => [ GET => '/example?format=ttl' ], code => 404
     }];
 
-$app = RDF::Light->new( 
-    source => \&dummy_source,
-    via_param => 0,
+$app = Plack::Middleware::RDF::Flow->new( 
+    source        => RDF::Flow::Dummy->new,
+    via_param     => 0,
     via_extension => 1
 );
 
@@ -57,10 +57,9 @@ test_app
         content => qr{example> a <http://www.w3.org/2000/01/rdf-schema#Resource>},
     }];
 
-
-$app = RDF::Light->new( 
-    source => \&dummy_source,
-    via_param => 1,
+$app = Plack::Middleware::RDF::Flow->new( 
+    source        => RDF::Flow::Dummy->new,
+    via_param     => 1,
     via_extension => 1
 );
 

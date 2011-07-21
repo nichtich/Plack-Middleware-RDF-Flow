@@ -7,8 +7,10 @@ use TestPlackApp;
 use Test::More;
 use Plack::Test;
 use Plack::Builder;
-use RDF::Light;
-use RDF::Source qw(source_uri dummy_source);
+use RDF::Flow qw(rdflow_uri);
+
+use RDF::Flow::Dummy;
+
 use Data::Dumper;
 
 #use Log::Contextual::SimpleLogger;
@@ -18,11 +20,11 @@ use Data::Dumper;
 my $not_found = sub { [404,['Content-Type'=>'text/plain'],['Not found']] };
 
 my $uri_not_found = sub {
-    [ 404, ['Content-Type'=>'text/plain'], [ source_uri(shift) ] ];
+    [ 404, ['Content-Type'=>'text/plain'], [ rdflow_uri(shift) ] ];
 };
 
 my $app = builder {
-    enable 'RDF::Light', source => \&dummy_source;
+    enable 'RDF::Flow', source => RDF::Flow::Dummy->new;
     $uri_not_found;
 };
 
@@ -45,7 +47,9 @@ test_app
 
 for my $base ( ('http://example.org/', '', 'my:') ) {
     $app = builder {
-        enable 'RDF::Light', source => \&dummy_source, base => $base;
+        enable 'RDF::Flow', 
+            source => RDF::Flow::Dummy->new, 
+            base => $base;
         $uri_not_found;
     };
 

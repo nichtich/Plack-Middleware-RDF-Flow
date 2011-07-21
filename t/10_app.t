@@ -9,14 +9,15 @@ use Plack::Test;
 use Plack::Builder;
 use Data::Dumper;
 use Try::Tiny;
-use RDF::Light;
+use Plack::Middleware::RDF::Flow;
 
-use RDF::Source qw(dummy_source);
+use RDF::Flow::Dummy;
+my $dummy = RDF::Flow::Dummy->new;
 
 my $not_found = sub { [404,['Content-Type'=>'text/plain'],['Not found']] };
 
 my $app = builder {
-    enable 'RDF::Light', source => sub { dummy_source @_ };
+    enable 'RDF::Flow', source => sub { $dummy->retrieve( @_ ) };
     $not_found;
 };
 
@@ -49,9 +50,11 @@ test_app
     }];
 
 $app = builder {
-    enable "+RDF::Light"; # empty_source
+    enable 'RDF::Flow'; # empty_source
     $not_found;
 };
+
+# TODO: test that rdflow.uri has been set
 
 test_app 
     app => $app,

@@ -5,12 +5,12 @@ use lib 't';
 use TestPlackApp;
 
 use Test::More;
-use RDF::Light;
-use RDF::Source qw(dummy_source);
+use RDF::Flow::Dummy;
+use Plack::Middleware::RDF::Flow;
 use RDF::Trine::NamespaceMap;
 
-my $app = RDF::Light->new( 
-    source => \&dummy_source,
+my $app = Plack::Middleware::RDF::Flow->new( 
+    source     => RDF::Flow::Dummy->new,
     namespaces => { rdfs => 'http://www.w3.org/2000/01/rdf-schema#' },
 );
 

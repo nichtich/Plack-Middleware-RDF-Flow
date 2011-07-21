@@ -1,19 +1,7 @@
-# Change file for RDF::Light
+# Change file for Plack::Middleware::RDF::Flow
+
+0.16 2011-07-21
+    Renamed to Plack::Middleware::RDF::Flow
 
 0.15 2011-07-19
-    removed RDF::Source
-
-0.13 2011-07-12
-    removed RDF::Light::Graph
-    renamed 'call' back to 'retrieve'
-
-0.11 2011-06-28
-    Added Pipeline and fixes
-    renamed 'retrieve' to 'call' and added Plack's method
-
-0.10 2011-06-21
-    Sources and extended Graph syntax
-
-0.01 2011-05-31
-    Inital public version
-
+    Experimental origin in RDF::Light, RDF::Source etc.
