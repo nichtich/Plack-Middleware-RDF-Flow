@@ -71,6 +71,26 @@ for my $base ( ('http://example.org/', '', 'my:') ) {
         }];
 }
 
+$app = builder {
+    enable 'RDF::Flow', 
+        source => RDF::Flow::Dummy->new,
+        base => 'http://example.com/',
+        rewrite => sub { s/com/org/; return $_ !~ 'foo'; };
+    $uri_not_found;
+};
+
+test_app
+    app => $app,
+    tests => [{
+        request => [ GET => '/' ],
+        content => "http://example.org/",
+        code    => 404,
+    },{
+        request => [ GET => '/foo' ],
+        content => "http://example.com/foo",
+        code    => 404,
+    }];
+
 done_testing;
 
 __END__

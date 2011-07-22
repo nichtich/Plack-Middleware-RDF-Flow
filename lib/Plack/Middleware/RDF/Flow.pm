@@ -20,7 +20,7 @@ use Carp;
 use parent 'Exporter', 'Plack::Middleware';
 
 use Plack::Util::Accessor qw(source base formats via_param via_extension 
-    namespaces pass_through empty_base);
+    namespaces pass_through empty_base rewrite);
 
 our @EXPORT_OK = qw(guess_serialization);
 
@@ -217,7 +217,17 @@ sub uri {
 
     my $path = $req->path;
     $path =~ s/^\///;
-    return $base.$path;
+    my $uri = $base.$path;
+
+    if ($self->{rewrite}) {
+        my $saved = $uri;
+        for ($uri) {
+            my $res = $self->{rewrite}->();
+            $uri = $saved unless $res;
+        }
+    }
+    
+    return $uri;
 }
 
 =head1 SYNOPSIS
@@ -305,6 +315,10 @@ Maps request URIs to a given URI prefix, similar to L<Plack::App::URLMap>.
 For instance if you deploy you application at C<http://your.domain/> and set
 base to C<http://other.domain/> then a request for C<http://your.domain/foo> 
 is be mapped to the URI C<http://other.domain/foo>.
+
+=item rewrite
+
+Code reference to rewrite the request URI.
 
 =item formats
 
