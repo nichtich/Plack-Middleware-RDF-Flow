@@ -13,7 +13,7 @@ use Plack::Request;
 use RDF::Trine qw(0.135 iri statement);
 use RDF::Trine::Serializer;
 use RDF::Trine::NamespaceMap;
-use RDF::Flow qw(rdflow rdflow_uri);
+use RDF::Flow qw(0.172 rdflow rdflow_uri);
 use Encode;
 use Carp;
 
@@ -192,7 +192,9 @@ sub guess_serialization {
         }
     }
 
-    log_trace { "Guessed serialization $type with " . ref($serializer) };
+    if ( $type ) {
+        log_trace { "Guessed serialization $type with " . ref($serializer) };
+    }
 
     return ($type, $serializer);
 }
@@ -301,12 +303,9 @@ Creates a new object.
 
 =item source
 
-Sets a L<RDF::Trine::Model> or a code reference as RDF source that returns a 
-Model or Iterator (see L<RDF::Flow>) to query from. You can also set 
-an array reference with a list of multiple sources, which are cascaded.
-
-For testing you can use the function dummy_source that always returns a single
-triple and can be exported by RDF::Flow.
+Sets a L<RDF::Trine::Model>, a code reference, or another kind of
+L<RDF::Flow::Source> to retrieve RDF data from.  For testing you can use the
+L<RDF::Flow::Source::Dummy> which always returns a single triple.
 
 =item base
 
