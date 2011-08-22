@@ -5,7 +5,7 @@ package Plack::Middleware::RDF::Flow;
 
 use Log::Contextual::WarnLogger;
 use Log::Contextual qw(:log), -default_logger
-    => Log::Contextual::WarnLogger->new({ env_prefix => __PACKAGE__ });
+    => Log::Contextual::WarnLogger->new({ env_prefix => 'PLACK_MIDDLEWARE_RDF_FLOW' });
 
 use Try::Tiny;
 use Scalar::Util qw(blessed);
@@ -13,13 +13,14 @@ use Plack::Request;
 use RDF::Trine qw(0.135 iri statement);
 use RDF::Trine::Serializer;
 use RDF::Trine::NamespaceMap;
-use RDF::Flow qw(0.172 rdflow rdflow_uri);
+use RDF::Flow qw(0.174 rdflow rdflow_uri);
 use Encode;
 use Carp;
 
 use parent 'Exporter', 'Plack::Middleware';
 
-use Plack::Util::Accessor qw(source base formats via_param via_extension 
+use Plack::Util::Accessor qw(
+    source base formats via_param via_extension
     namespaces pass_through empty_base rewrite);
 
 our @EXPORT_OK = qw(guess_serialization);
@@ -34,7 +35,7 @@ our %rdf_formats = (
 );
 
 # TODO:
-# * Show how to add custom serializers
+# * Show how to add custom serializers, e.g. SVG, highlighted TTL etc.
 
 sub prepare_app {
     my $self = shift;
@@ -62,9 +63,27 @@ sub call {
 
     my ($type, $serializer) = $self->guess_serialization( $env );
 
-    # TODO: put uri into another module?
-    $env->{'rdflow.uri'} = $self->uri( $env )
-        unless defined $env->{'rdflow.uri'};
+    unless ( defined $env->{'rdflow.uri'} ) {
+        my $req = Plack::Request->new( $env );
+
+        my $base = defined $self->base ? $self->base : $req->base;
+
+        my $path = $req->path;
+        $path =~ s/^\///;
+        my $uri = $base.$path;
+        # $env->{'rdflow.ignorepath'} = 1;
+
+        # TODO: more rewriting based on Plack::App::URLMap ?
+        if ($self->{rewrite}) {
+            my $saved = $uri;
+            for ($uri) {
+                my $res = $self->{rewrite}->();
+                $uri = $saved unless $res;
+            }
+        }
+
+        $env->{'rdflow.uri'} = $uri;
+    }
 
     if ( $type ) {
         $env->{'rdflow.type'}       = $type;
@@ -78,9 +97,9 @@ sub call {
 
         my $rdf_data;
 
-        if ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Model' ) ) { 
+        if ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Model' ) ) {
             $rdf_data = $serializer->serialize_model_to_string( $rdf );
-        } elsif ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Iterator' ) ) { 
+        } elsif ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Iterator' ) ) {
             $rdf_data = $serializer->serialize_iterator_to_string( $rdf );
         }
 
@@ -93,7 +112,7 @@ sub call {
         $env->{'rdflow.data'} = $rdf;
     }
 
-    # pass through if no/unknown serializer or empty source (URI not found) or error 
+    # pass through if no/unknown serializer or empty source (URI not found) or error
     if ( $app ) {
         return $app->( $env );
     } else {
@@ -101,16 +120,16 @@ sub call {
     }
 }
 
-=head2 retrieve ( $env )
+=head2 _retrieve ( $env )
 
-Given a L<PSGI> environment, this method queries the source(s) for a 
-requested URI (if given) and either returns undef or a non-empty
-L<RDF::Trine::Model> or L<RDF::Trine::Iterator>. On error this method
-does not die but sets the environment variable rdflow.error. Note that
-if there are multiple source, there may be both an error, and a return 
-value.
+Given a L<PSGI> environment, this internal (!) method queries the source(s) for
+a requested URI (if given) and either returns undef or a non-empty
+L<RDF::Trine::Model> or L<RDF::Trine::Iterator>. On error this method does not
+die but sets the environment variable rdflow.error. Note that if there are
+multiple source, there may be both an error, and a return value.
 
 =cut
+
 sub _retrieve {
     my ($self,$env) = @_;
 
@@ -121,27 +140,9 @@ sub _retrieve {
         return RDF::Trine::Model->new;
     }
 
-    my $src = $self->source;
-
     log_trace { 'Retrieve from source' };
-    my $rdf = $src->retrieve( $env );
-    #  my $rdf = try {
-    #   my $rdf = $src->retrieve( $env );
-        #} catch {
-        #    $_ =~ s/ at.+ line \d+.?\n?//; # TODO: is there a cleaner way?
-        #    $env->{'rdflow.error'} = $_;
-        #    RDF::Trine::Model->new;
-        #};
+    my $rdf = $self->source->retrieve( $env );
 
-        #return unless defined $rdf;
-
-    #   if ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Model' ) ) { 
-    #       $rdf if $rdf->size > 0;
-    #   } elsif ( UNIVERSAL::isa( $rdf, 'RDF::Trine::Iterator' ) ) {
-    #       return $rdf if $rdf->peek;
-    #   } else {
-    #       $env->{'rdflow.error'} = 'Invalid source';
-    #   }
     return $rdf;
 }
 
@@ -153,7 +154,7 @@ sub guess_serialization {
         ($self, $env) = ($env, shift);
         $possible_formats = $self->formats;
     } else {
-        $possible_formats = \%rdf_formats; 
+        $possible_formats = \%rdf_formats;
     }
 
     # TODO: check $env{rdflow.type} / $env{rdflow.serializer}
@@ -170,19 +171,23 @@ sub guess_serialization {
             $env->{PATH_INFO} = $1;
             $format = $2;
         }
-    }    
+    }
 
     my ($type, $serializer);
 
     if ($format) {
         my $name = $possible_formats->{$format};
-        if ($name) { try {
-            my $namespaces = $self->namespaces;
-            $serializer = RDF::Trine::Serializer->new( $name, namespaces => $namespaces );
-            ($type) = $serializer->media_types;
-        } } # TODO: catch if unknown format or format not available
+        if ($name) {
+            try {
+                my $namespaces = $self->namespaces;
+                $serializer = RDF::Trine::Serializer->new( $name, namespaces => $namespaces );
+                ($type) = $serializer->media_types;
+            }
+        } else {
+            # TODO: Catch if unknown format or format not available?
+        }
     } else {
-        ($type, $serializer) = try { 
+        ($type, $serializer) = try {
             RDF::Trine::Serializer->negotiate( request_headers => $req->headers );
             # TODO: maybe add extend => ...
         };
@@ -199,39 +204,6 @@ sub guess_serialization {
     return ($type, $serializer);
 }
 
-sub uri { 
-    my $env = shift;
-
-    return $env->{'rdflow.uri'} if defined $env->{'rdflow.uri'};
-
-    my ($base, $self); # TODO: support as second argument
-
-    if (blessed $env and $env->isa('Plack::Middleware::RDF::Flow')) {
-        ($self, $env) = ($env, shift);
-        $base = $self->base;
-    }
-
-    # TODO: more rewriting based on Plack::App::URLMap
-    
-    my $req = Plack::Request->new( $env );
-
-    $base = defined $base ? $base : $req->base;
-
-    my $path = $req->path;
-    $path =~ s/^\///;
-    my $uri = $base.$path;
-
-    if ($self->{rewrite}) {
-        my $saved = $uri;
-        for ($uri) {
-            my $res = $self->{rewrite}->();
-            $uri = $saved unless $res;
-        }
-    }
-    
-    return $uri;
-}
-
 =head1 SYNOPSIS
 
     use Plack::Builder;
@@ -244,67 +216,58 @@ sub uri {
         my $env = shift;
         my $uri = rdflow_uri( $env );
 
-        [ 404, ['Content-Type'=>'text/plain'], 
+        [ 404, ['Content-Type'=>'text/plain'],
                ["URI $uri not found or not requested as RDF"] ];
     };
 
     builder {
-        enable 'RDF::Flow',
-            source => $model;
+        enable 'RDF::Flow', source => $model;
         $app;
     }
 
-=cut
+=head1 DESCRIPTION
 
+This package provides a PSGI application that can be used as
+L<Plack::Middleware> to provide RDF data, based on
+L<RDF::Flow> and L<RDF::Trine>.
 
-=head1 INTRODUCTION
-
-This package provides a PSGI application to serve RDF as Linked Data. In
-contrast to other Linked Data applications, URIs must not have query parts and
-the distinction between information-resources and non-information resources is
-disregarded (some Semantic Web evangelists may be angry about this). By now
-this package is experimental. For a more complete package see
-L<RDF::LinkedData>.
-
-The package implements a PSGI application that can be used as
-L<Plack::Middleware> to provide RDF data. The implementation is based on
-L<RDF::Trine> which is a full implementation of RDF standards in Perl.
-
-=head1 OVERVIEW
-
-An RDF::Flow application processes PSGI/HTTP requests in three steps:
+A PSGI/HTTP requests is processed in three steps:
 
 =over 4
 
 =item 1
 
 Determine query URI and serialization format (mime type) and set the request
-variables C<rdflow.uri>, C<rdflow.type>, and C<rdflow.serializer>.
+variables C<rdflow.uri>, C<rdflow.type>, and C<rdflow.serializer>. The request
+URI is either taken from C<< $env->{'rdflow.uri'} >> (if defined) or
+constructed from request's base and path. Query parameters are ignored by
+default.
 
 =item 2
 
-Retrieve data about the resource which is identified by the request URI.
+Retrieve data from a L<RDF::Flow::Source> about the resource identified by
+C<rdflow.uri>.
 
 =item 3
 
-Create a serialization.
+Create a serialization, if requested for C<rdflow.type>.
 
 =back
 
 =head1 METHODS
 
-=head2 new ( [ %configuration ] )
-
 Creates a new object.
 
 =head2 CONFIGURATION
+
+The following options can be set when creating a new object with C<new>.
 
 =over 4
 
 =item source
 
 Sets a L<RDF::Trine::Model>, a code reference, or another kind of
-L<RDF::Flow::Source> to retrieve RDF data from.  For testing you can use the
+L<RDF::Flow::Source> to retrieve RDF data from.  For testing you can use
 L<RDF::Flow::Source::Dummy> which always returns a single triple.
 
 =item base
@@ -312,7 +275,7 @@ L<RDF::Flow::Source::Dummy> which always returns a single triple.
 Maps request URIs to a given URI prefix, similar to L<Plack::App::URLMap>.
 
 For instance if you deploy you application at C<http://your.domain/> and set
-base to C<http://other.domain/> then a request for C<http://your.domain/foo> 
+base to C<http://other.domain/> then a request for C<http://your.domain/foo>
 is be mapped to the URI C<http://other.domain/foo>.
 
 =item rewrite
@@ -321,8 +284,8 @@ Code reference to rewrite the request URI.
 
 =item formats
 
-Defines supported serialization formats. You can either specify an array 
-reference with serializer names or a hash reference with mappings of format 
+Defines supported serialization formats. You can either specify an array
+reference with serializer names or a hash reference with mappings of format
 names to serializer names. Serializer names must exist in
 RDF::Trine's L<RDF::Trine::Serializer>::serializer_names.
 
@@ -336,8 +299,8 @@ RDF::Trine's L<RDF::Trine::Serializer>::serializer_names.
   } );
 
 By default the formats rdf, xml, and rdfxml (for L<RDF::Trine::Serializer>),
-ttl (for L<RDF::Trine::Serializer::Turtle>), json 
-(for L<RDF::Trine::Serializer::RDFJSON>), and nt 
+ttl (for L<RDF::Trine::Serializer::Turtle>), json
+(for L<RDF::Trine::Serializer::RDFJSON>), and nt
 (for L<RDF::Trine::Serializer::NTriples>) are used.
 
 =item via_param
@@ -363,6 +326,8 @@ Enable file extensions (not implemented yet).
 
 =back
 
+=head1 FUNCTIONS
+
 =head2 guess_serialization ( $env )
 
 Given a PSGI request this function checks whether an RDF serialization format
@@ -370,21 +335,17 @@ has been B<explicitly> asked for, either by HTTP content negotiation or by
 format query parameter or by file extension. You can call this as method or
 as function and export it on request.
 
-=head1 FUNCTIONS
+=head1 LIMITATIONS
 
-=head2 uri ( $env )
-
-Returns a request URI as string. The request URI is either taken from
-C<$env->{'rdflow.uri'}> (if defined) or constructed from request's base 
-and path. Query parameters are ignored.
-
-=cut
+By now this package is experimental. Extensions are not supported yet. In
+contrast to other Linked Data applications, URIs must not have query parts and
+the distinction between information-resources and non-information resources is
+disregarded (some Semantic Web evangelists may be angry about this).
 
 =head2 SEE ALSO
 
-See also L<RDF::Lazy>.
-
-To test you applications you should use L<Test::RDF>.
+For a more complete package see L<RDF::LinkedData>. You should always use
+L<Plack::Test> and L<Test::RDF> to test you application.
 
 =head2 ACKNOWLEDGEMENTS
 

@@ -33,7 +33,7 @@ sub test_app {
 
             pass( '---- ' . $test->{name} . ' ----' ) if $test->{name};
             my $handler = builder {
-                enable sub { 
+                enable sub {
                     my $app = shift;
                     sub {
                         my $env = shift;
@@ -48,18 +48,18 @@ sub test_app {
                 $app;
             };
 
-            test_psgi $handler, sub { 
+            test_psgi $handler, sub {
                 my $cb = shift;
 
                 my $res = $cb->( HTTP::Request->new( @{$test->{request}} ) );
 
                 if ( defined $test->{code} ) {
-                    is( $res->code, $test->{code}, 
+                    is( $res->code, $test->{code},
                         'Got status code '.$res->code.' as expected' );
                 }
 
                 if ( defined $test->{content} ) {
-                    is_like( $res->content, $test->{content}, 
+                    is_like( $res->content, $test->{content},
                         'Got content as expected' );
                 }
 
@@ -85,11 +85,11 @@ sub test_app {
                         my $expected = $test->{logged}->[$i];
                         my $got  = $log[$i];
                         if ( $expected->{level} ) {
-                            is( $got->{level}, $expected->{level}, 
+                            is( $got->{level}, $expected->{level},
                                 "Got logging level as expected" );
                         }
                         if ( defined $expected->{message} ) {
-                            is_like( $got->{message}, $expected->{message}, 
+                            is_like( $got->{message}, $expected->{message},
                                 "Got logging message as expected" );
                         }
                     }
@@ -118,7 +118,7 @@ TestPlackApp - Test PSGI applications with Plack::Test
 
 L<Test::WWW::Mechanize::Plack>.
 
-This module is located at L<https://gist.github.com/1024502> until it is 
+This module is located at L<https://gist.github.com/1024502> until it is
 merged into another Perl module or published as tested module.
 
 =cut

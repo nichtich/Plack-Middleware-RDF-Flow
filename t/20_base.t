@@ -47,8 +47,8 @@ test_app
 
 for my $base ( ('http://example.org/', '', 'my:') ) {
     $app = builder {
-        enable 'RDF::Flow', 
-            source => RDF::Flow::Dummy->new, 
+        enable 'RDF::Flow',
+            source => RDF::Flow::Dummy->new,
             base => $base;
         $uri_not_found;
     };
@@ -72,7 +72,7 @@ for my $base ( ('http://example.org/', '', 'my:') ) {
 }
 
 $app = builder {
-    enable 'RDF::Flow', 
+    enable 'RDF::Flow',
         source => RDF::Flow::Dummy->new,
         base => 'http://example.com/',
         rewrite => sub { s/com/org/; return $_ !~ 'foo'; };
@@ -96,7 +96,7 @@ done_testing;
 __END__
 use HTTP::Request::Common;
 
-test_psgi $app, sub { 
+test_psgi $app, sub {
     my $app = shift;
     my $res = $app->(GET '/example');
     is_deeply $res, [404,['Content-Type' => 'text/plain']['Not found'];

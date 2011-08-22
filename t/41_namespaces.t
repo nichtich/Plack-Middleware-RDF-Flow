@@ -9,7 +9,7 @@ use RDF::Flow::Dummy;
 use Plack::Middleware::RDF::Flow;
 use RDF::Trine::NamespaceMap;
 
-my $app = Plack::Middleware::RDF::Flow->new( 
+my $app = Plack::Middleware::RDF::Flow->new(
     source     => RDF::Flow::Dummy->new,
     namespaces => { rdfs => 'http://www.w3.org/2000/01/rdf-schema#' },
 );
@@ -17,7 +17,7 @@ my $app = Plack::Middleware::RDF::Flow->new(
 ns_test();
 
 $app->namespaces( RDF::Trine::NamespaceMap->new( {
-    rdfs => 'http://www.w3.org/2000/01/rdf-schema#', 
+    rdfs => 'http://www.w3.org/2000/01/rdf-schema#',
 } ) );
 
 ns_test();

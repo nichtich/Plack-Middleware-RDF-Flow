@@ -8,7 +8,7 @@ use Test::More;
 use Plack::Middleware::RDF::Flow;
 use RDF::Flow::Dummy;
 
-my $app = Plack::Middleware::RDF::Flow->new( 
+my $app = Plack::Middleware::RDF::Flow->new(
     source => RDF::Flow::Dummy->new
 );
 
@@ -35,7 +35,7 @@ test_app
         request => [ GET => '/example?format=ttl' ], code => 404
     }];
 
-$app = Plack::Middleware::RDF::Flow->new( 
+$app = Plack::Middleware::RDF::Flow->new(
     source        => RDF::Flow::Dummy->new,
     via_param     => 0,
     via_extension => 1
@@ -57,7 +57,7 @@ test_app
         content => qr{example> a <http://www.w3.org/2000/01/rdf-schema#Resource>},
     }];
 
-$app = Plack::Middleware::RDF::Flow->new( 
+$app = Plack::Middleware::RDF::Flow->new(
     source        => RDF::Flow::Dummy->new,
     via_param     => 1,
     via_extension => 1

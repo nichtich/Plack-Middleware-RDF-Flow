@@ -56,7 +56,7 @@ $app = builder {
 
 # TODO: test that rdflow.uri has been set
 
-test_app 
+test_app
     app => $app,
     tests => [{
         name    => 'nobody asked for RDF',
