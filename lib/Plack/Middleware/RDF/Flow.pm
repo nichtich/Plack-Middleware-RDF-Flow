@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 package Plack::Middleware::RDF::Flow;
-#ABSTRACT: Simplified Linked Data provider
+#ABSTRACT: Serve RDF as Linked Data for RDF::Flow
 
 use Log::Contextual::WarnLogger;
 use Log::Contextual qw(:log), -default_logger
@@ -13,7 +13,7 @@ use Plack::Request;
 use RDF::Trine qw(0.135 iri statement);
 use RDF::Trine::Serializer;
 use RDF::Trine::NamespaceMap;
-use RDF::Flow qw(0.174 rdflow rdflow_uri);
+use RDF::Flow qw(0.175 rdflow rdflow_uri);
 use Encode;
 use Carp;
 
@@ -33,9 +33,6 @@ our %rdf_formats = (
     json   => 'rdfjson',
     ttl    => 'turtle'
 );
-
-# TODO:
-# * Show how to add custom serializers, e.g. SVG, highlighted TTL etc.
 
 sub prepare_app {
     my $self = shift;
@@ -176,16 +173,16 @@ sub guess_serialization {
     my ($type, $serializer);
 
     if ($format) {
-        my $name = $possible_formats->{$format};
-        if ($name) {
+        my $ser = $possible_formats->{$format};
+        if ( blessed $ser and $ser->isa('RDF::Trine::Serializer') ) {
+            $serializer = $ser;
+        } elsif ( $ser and not ref $ser ) {
             try {
                 my $namespaces = $self->namespaces;
-                $serializer = RDF::Trine::Serializer->new( $name, namespaces => $namespaces );
-                ($type) = $serializer->media_types;
+                $serializer = RDF::Trine::Serializer->new( $ser, namespaces => $namespaces );
             }
-        } else {
-            # TODO: Catch if unknown format or format not available?
         }
+        ($type) = $serializer->media_types if $serializer;
     } else {
         ($type, $serializer) = try {
             RDF::Trine::Serializer->negotiate( request_headers => $req->headers );
@@ -227,11 +224,13 @@ sub guess_serialization {
 
 =head1 DESCRIPTION
 
-This package provides a PSGI application that can be used as
-L<Plack::Middleware> to provide RDF data, based on
-L<RDF::Flow> and L<RDF::Trine>.
+This L<Plack::Middleware> provides a PSGI application to serve Linked Data.
+An HTTP request is mapped to an URI, that is used to retrieve RDF data from
+a L<RDF::Trine::Model> or L<RDF::Flow::Source>. Depending on the request and
+settings, the data is either returned in a requested serialization format or
+it is passed to the next PSGI application for further processing.
 
-A PSGI/HTTP requests is processed in three steps:
+In detail each request is processed as following:
 
 =over 4
 
@@ -245,18 +244,17 @@ default.
 
 =item 2
 
-Retrieve data from a L<RDF::Flow::Source> about the resource identified by
-C<rdflow.uri>.
+Retrieve data from a L<RDF::Trine::Model> or a L<RDF::Flow::Source> about the
+resource identified by C<rdflow.uri>, if a serialization format was determined
+or if C<pass_through> is set.
 
 =item 3
 
-Create a serialization, if requested for C<rdflow.type>.
+Create and return a serialization, if a serialization format was determined.
+Otherwise store the retrieved RDF data in C<rdflow.data> and pass to the next
+application.
 
 =back
-
-=head1 METHODS
-
-Creates a new object.
 
 =head2 CONFIGURATION
 
@@ -282,26 +280,35 @@ is be mapped to the URI C<http://other.domain/foo>.
 
 Code reference to rewrite the request URI.
 
+=item pass_through
+
+Retrieve RDF data
+
 =item formats
 
 Defines supported serialization formats. You can either specify an array
 reference with serializer names or a hash reference with mappings of format
-names to serializer names. Serializer names must exist in
-RDF::Trine's L<RDF::Trine::Serializer>::serializer_names.
+names to serializer names or serializer instances. Serializer names must exist
+in RDF::Trine's L<RDF::Trine::Serializer>::serializer_names and serializer
+instances must be subclasses of L<RDF::Trine::Serializer>.
 
   Plack::Middleware::RDF::Flow->new ( formats => [qw(ntriples rdfxml turtle)] )
+
+  # Plack::Middleware::RDF::Foo
+  my $fooSerializer = Plack::Middleware::RDF->new( 'foo' );
 
   Plack::Middleware::RDF::Flow->new ( formats => {
       nt  => 'ntriples',
       rdf => 'rdfxml',
       xml => 'rdfxml',
-      ttl => 'turtle'
+      ttl => 'turtle',
+      foo => $fooSerializer
   } );
 
 By default the formats rdf, xml, and rdfxml (for L<RDF::Trine::Serializer>),
-ttl (for L<RDF::Trine::Serializer::Turtle>), json
-(for L<RDF::Trine::Serializer::RDFJSON>), and nt
-(for L<RDF::Trine::Serializer::NTriples>) are used.
+ttl (for L<RDF::Trine::Serializer::Turtle>), json (for
+L<RDF::Trine::Serializer::RDFJSON>), and nt (for
+L<RDF::Trine::Serializer::NTriples>) are supported.
 
 =item via_param
 

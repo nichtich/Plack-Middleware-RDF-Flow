@@ -1,10 +1,10 @@
 # NAME
 
-Plack::Middleware::RDF::Flow - Simplified Linked Data provider
+Plack::Middleware::RDF::Flow - Serve RDF as Linked Data for RDF::Flow
 
 # VERSION
 
-version 0.165
+version 0.170
 
 # SYNOPSIS
 
@@ -29,11 +29,13 @@ version 0.165
 
 # DESCRIPTION
 
-This package provides a PSGI application that can be used as
-[Plack::Middleware](http://search.cpan.org/perldoc?Plack::Middleware) to provide RDF data, based on
-[RDF::Flow](http://search.cpan.org/perldoc?RDF::Flow) and [RDF::Trine](http://search.cpan.org/perldoc?RDF::Trine).
+This [Plack::Middleware](http://search.cpan.org/perldoc?Plack::Middleware) provides a PSGI application to serve Linked Data.
+An HTTP request is mapped to an URI, that is used to retrieve RDF data from
+a [RDF::Trine::Model](http://search.cpan.org/perldoc?RDF::Trine::Model) or [RDF::Flow::Source](http://search.cpan.org/perldoc?RDF::Flow::Source). Depending on the request and
+settings, the data is either returned in a requested serialization format or
+it is passed to the next PSGI application for further processing.
 
-A PSGI/HTTP requests is processed in three steps:
+In detail each request is processed as following:
 
 - 1
 
@@ -45,24 +47,15 @@ default.
 
 - 2
 
-Retrieve data from a [RDF::Flow::Source](http://search.cpan.org/perldoc?RDF::Flow::Source) about the resource identified by
-`rdflow.uri`.
+Retrieve data from a [RDF::Trine::Model](http://search.cpan.org/perldoc?RDF::Trine::Model) or a [RDF::Flow::Source](http://search.cpan.org/perldoc?RDF::Flow::Source) about the
+resource identified by `rdflow.uri`, if a serialization format was determined
+or if `pass_through` is set.
 
 - 3
 
-Create a serialization, if requested for `rdflow.type`.
-
-## _retrieve ( $env )
-
-Given a [PSGI](http://search.cpan.org/perldoc?PSGI) environment, this internal (!) method queries the source(s) for
-a requested URI (if given) and either returns undef or a non-empty
-[RDF::Trine::Model](http://search.cpan.org/perldoc?RDF::Trine::Model) or [RDF::Trine::Iterator](http://search.cpan.org/perldoc?RDF::Trine::Iterator). On error this method does not
-die but sets the environment variable rdflow.error. Note that if there are
-multiple source, there may be both an error, and a return value.
-
-# METHODS
-
-Creates a new object.
+Create and return a serialization, if a serialization format was determined.
+Otherwise store the retrieved RDF data in `rdflow.data` and pass to the next
+application.
 
 ## CONFIGURATION
 
@@ -86,26 +79,35 @@ is be mapped to the URI `http://other.domain/foo`.
 
 Code reference to rewrite the request URI.
 
+- pass_through
+
+Retrieve RDF data
+
 - formats
 
 Defines supported serialization formats. You can either specify an array
 reference with serializer names or a hash reference with mappings of format
-names to serializer names. Serializer names must exist in
-RDF::Trine's [RDF::Trine::Serializer](http://search.cpan.org/perldoc?RDF::Trine::Serializer)::serializer_names.
+names to serializer names or serializer instances. Serializer names must exist
+in RDF::Trine's [RDF::Trine::Serializer](http://search.cpan.org/perldoc?RDF::Trine::Serializer)::serializer_names and serializer
+instances must be subclasses of [RDF::Trine::Serializer](http://search.cpan.org/perldoc?RDF::Trine::Serializer).
 
   Plack::Middleware::RDF::Flow->new ( formats => [qw(ntriples rdfxml turtle)] )
+
+  # Plack::Middleware::RDF::Foo
+  my $fooSerializer = Plack::Middleware::RDF->new( 'foo' );
 
   Plack::Middleware::RDF::Flow->new ( formats => {
       nt  => 'ntriples',
       rdf => 'rdfxml',
       xml => 'rdfxml',
-      ttl => 'turtle'
+      ttl => 'turtle',
+      foo => $fooSerializer
   } );
 
 By default the formats rdf, xml, and rdfxml (for [RDF::Trine::Serializer](http://search.cpan.org/perldoc?RDF::Trine::Serializer)),
-ttl (for [RDF::Trine::Serializer::Turtle](http://search.cpan.org/perldoc?RDF::Trine::Serializer::Turtle)), json
-(for [RDF::Trine::Serializer::RDFJSON](http://search.cpan.org/perldoc?RDF::Trine::Serializer::RDFJSON)), and nt
-(for [RDF::Trine::Serializer::NTriples](http://search.cpan.org/perldoc?RDF::Trine::Serializer::NTriples)) are used.
+ttl (for [RDF::Trine::Serializer::Turtle](http://search.cpan.org/perldoc?RDF::Trine::Serializer::Turtle)), json (for
+[RDF::Trine::Serializer::RDFJSON](http://search.cpan.org/perldoc?RDF::Trine::Serializer::RDFJSON)), and nt (for
+[RDF::Trine::Serializer::NTriples](http://search.cpan.org/perldoc?RDF::Trine::Serializer::NTriples)) are supported.
 
 - via_param
 
@@ -127,6 +129,14 @@ Enable file extensions (not implemented yet).
     http://example.org/{id}.html
     http://example.org/{id}.rdf
     http://example.org/{id}.ttl
+
+## _retrieve ( $env )
+
+Given a [PSGI](http://search.cpan.org/perldoc?PSGI) environment, this internal (!) method queries the source(s) for
+a requested URI (if given) and either returns undef or a non-empty
+[RDF::Trine::Model](http://search.cpan.org/perldoc?RDF::Trine::Model) or [RDF::Trine::Iterator](http://search.cpan.org/perldoc?RDF::Trine::Iterator). On error this method does not
+die but sets the environment variable rdflow.error. Note that if there are
+multiple source, there may be both an error, and a return value.
 
 # FUNCTIONS
 
