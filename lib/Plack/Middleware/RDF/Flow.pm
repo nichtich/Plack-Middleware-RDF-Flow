@@ -100,7 +100,7 @@ sub call {
             $rdf_data = $serializer->serialize_iterator_to_string( $rdf );
         }
 
-        if ( defined $rdf_data ) {
+        if ( $rdf_data ) {
             $rdf_data = encode('utf8',$rdf_data);
             return [ 200, [ 'Content-Type' => $type ], [ $rdf_data ] ];
         }
@@ -282,7 +282,8 @@ Code reference to rewrite the request URI.
 
 =item pass_through
 
-Retrieve RDF data
+Retrieve RDF data also if no serialization format was determined. In this case
+RDF data is stored in C<rdflow.data> and passed to the next layer.
 
 =item formats
 

@@ -1,5 +1,8 @@
 # Change file for Plack::Middleware::RDF::Flow
 
+0.171 2011-11-03
+    Fix for empty sources
+
 0.170 2011-09-02
     First release at CPAN
 

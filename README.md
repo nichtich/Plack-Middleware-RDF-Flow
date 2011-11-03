@@ -4,7 +4,7 @@ Plack::Middleware::RDF::Flow - Serve RDF as Linked Data for RDF::Flow
 
 # VERSION
 
-version 0.170
+version 0.171
 
 # SYNOPSIS
 
@@ -81,7 +81,8 @@ Code reference to rewrite the request URI.
 
 - pass_through
 
-Retrieve RDF data
+Retrieve RDF data also if no serialization format was determined. In this case
+RDF data is stored in `rdflow.data` and passed to the next layer.
 
 - formats
 
