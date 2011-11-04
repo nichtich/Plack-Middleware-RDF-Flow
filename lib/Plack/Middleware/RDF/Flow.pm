@@ -278,7 +278,16 @@ is be mapped to the URI C<http://other.domain/foo>.
 
 =item rewrite
 
-Code reference to rewrite the request URI.
+Code reference to rewrite the request URI. The code gets the URI in local
+variable C<$_> and can modify it. The URI is only modifed, if the code returns
+a true value. The following example normalized dbpedia URIs:
+
+    rewrite => sub {
+        $_ =~ qr{^(http://dbpedia.org/resource/)(.+)$} or return;
+        $_ = $1 . uri_escape($2);
+        $_ =~ s/%20/_/g;
+        return $_;
+    }
 
 =item pass_through
 
